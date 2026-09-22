@@ -56,11 +56,14 @@ class ScannerNAPS2(ScannerBase):
     nama = "NAPS2"
 
     def _exe(self):
+        app_dir = Path(os.path.dirname(sys.executable)) if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
         kandidat = [
             shutil.which("NAPS2.Console"),
             shutil.which("naps2"),
             r"C:\Program Files\NAPS2\NAPS2.Console.exe",
             r"C:\Program Files (x86)\NAPS2\NAPS2.Console.exe",
+            str(app_dir / "NAPS2.Console.exe"),
+            str(app_dir / "naps2" / "NAPS2.Console.exe"),
         ]
         for k in kandidat:
             if k and os.path.exists(k):
@@ -76,11 +79,23 @@ class ScannerNAPS2(ScannerBase):
             raise ScannerError("NAPS2 belum terpasang. Unduh gratis di naps2.com atau pakai mode Upload.")
         # {nnn} = penomoran otomatis NAPS2
         keluaran = str(folder / f"{prefix}_$(nnn).png")
+
+        # 1. Coba pertama menggunakan driver WIA
         cmd = [exe, "-o", keluaran, "--noprofile", "--driver", "wia",
                "--source", "feeder", "--dpi", str(dpi), "--force"]
         r = subprocess.run(cmd, capture_output=True, text=True)
+
+        # 2. Jika WIA gagal (sering terjadi pada scanner Brother ADF), fallback otomatis ke TWAIN
         if r.returncode != 0:
-            raise ScannerError(f"Scan gagal: {(r.stderr or r.stdout).strip()[-300:]}")
+            cmd_twain = [exe, "-o", keluaran, "--noprofile", "--driver", "twain",
+                         "--source", "feeder", "--dpi", str(dpi), "--force"]
+            r_twain = subprocess.run(cmd_twain, capture_output=True, text=True)
+            if r_twain.returncode == 0:
+                r = r_twain
+            else:
+                pesan_err = (r_twain.stderr or r_twain.stdout or r.stderr or r.stdout).strip()
+                raise ScannerError(f"Scan gagal (WIA & TWAIN): {pesan_err[-300:]}")
+
         hasil = sorted(Path(p) for p in glob.glob(str(folder / f"{prefix}_*.png")))
         return hasil[:jumlah] if jumlah else hasil
 
