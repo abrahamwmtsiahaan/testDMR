@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+opencv-python<5.0.0
+numpy<2.0.0
+pymupdf
+pydantic
+pyinstaller
+python-multipart
+python-dotenv

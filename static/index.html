@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LJK Reader</title>
+<link rel="stylesheet" href="/static/style.css?v=4">
+</head>
+<body>
+
+<header>
+  <div class="brand">LJK Reader</div>
+  <nav id="nav">
+    <button data-tab="template" class="aktif">1. Template</button>
+    <button data-tab="scan">2. Scan</button>
+    <button data-tab="periksa">3. Periksa</button>
+    <button data-tab="simpan">4. Simpan</button>
+  </nav>
+  <div id="status-scanner" class="status">Memeriksa scanner...</div>
+</header>
+
+<main>
+
+  <!-- ================= TAB 1: TEMPLATE ================= -->
+  <section id="tab-template" class="tab aktif">
+    <div class="panel kiri">
+      <h2>Template lembar</h2>
+
+      <div class="baris">
+        <label>Template tersimpan</label>
+        <div class="grup">
+          <select id="pilih-template"></select>
+          <button id="btn-muat-template" class="kecil">Muat</button>
+        </div>
+      </div>
+
+      <div class="baris">
+        <label>Nama template</label>
+        <input id="nama-template" type="text" placeholder="mis. LJK PPTSB 2026">
+      </div>
+
+      <h3>1. Lembar contoh</h3>
+      <p class="petunjuk">Ambil satu lembar contoh (boleh kosong atau terisi) supaya posisi bulatan bisa ditandai.</p>
+      <div class="grup">
+        <button id="btn-scan-contoh" class="utama">Scan lembar contoh</button>
+        <label class="tombol-file kecil">Unggah gambar
+          <input id="file-contoh" type="file" accept="image/*,.pdf" hidden>
+        </label>
+      </div>
+      <div id="info-contoh" class="info"></div>
+
+      <h3>2. Bagian yang dibaca</h3>
+      <div id="daftar-bagian"></div>
+      <button id="btn-tambah-bagian" class="kecil">+ Tambah bagian</button>
+
+      <div class="pemisah"></div>
+      <button id="btn-simpan-template" class="utama besar">Simpan template</button>
+      <div id="info-template" class="info"></div>
+    </div>
+
+    <div class="panel kanan">
+      <div id="bantuan-kalibrasi" class="bantuan">
+        Pilih sebuah bagian di kiri, lalu klik <b>Tandai posisi</b>.
+      </div>
+      <div class="kanvas-wrap" id="wrap-kalibrasi">
+        <canvas id="kanvas-kalibrasi"></canvas>
+        <div class="kontrol-zoom">
+          <button id="zoom-in" title="Perbesar">+</button>
+          <button id="zoom-out" title="Perkecil">−</button>
+          <button id="zoom-pas" title="Pas layar">⤢</button>
+        </div>
+        <div class="kaca" id="kaca"><canvas id="kaca-kanvas" width="160" height="160"></canvas></div>
+      </div>
+      <div class="catatan">Scroll = zoom &nbsp;·&nbsp; Tahan klik kanan / spasi + seret = geser &nbsp;·&nbsp; Klik tepat di <b>tengah bulatan</b></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 2: SCAN ================= -->
+  <section id="tab-scan" class="tab">
+    <div class="tengah">
+      <h2>Scan lembar jawaban</h2>
+
+      <div class="baris">
+        <label>Template</label>
+        <select id="scan-template"></select>
+      </div>
+
+      <div id="blok-scanner">
+        <div class="baris">
+          <label>Jumlah lembar yang akan di-scan</label>
+          <input id="scan-jumlah" type="number" min="1" value="1">
+        </div>
+        <p class="petunjuk">Letakkan lembar di ADF (menghadap sesuai petunjuk scanner), lalu tekan tombol.</p>
+        <button id="btn-mulai-scan" class="utama besar">MULAI SCAN</button>
+      </div>
+
+      <div class="atau" id="atau"><span>atau</span></div>
+
+      <div id="dropzone" class="dropzone">
+        <div class="dz-judul">Seret gambar / PDF hasil scan ke sini</div>
+        <div class="dz-sub">atau <label class="link">pilih file<input id="file-scan" type="file" accept="image/*,.pdf" multiple hidden></label></div>
+      </div>
+
+      <div id="proses" class="proses" hidden>
+        <div class="spinner"></div>
+        <div id="proses-teks">Memproses...</div>
+      </div>
+      <div id="info-scan" class="info"></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 3: PERIKSA ================= -->
+  <section id="tab-periksa" class="tab">
+    <div class="periksa">
+      <div class="panel tabel-panel">
+        <div class="bar-atas">
+          <h2>Hasil bacaan</h2>
+          <div class="grup">
+            <label class="cek"><input type="checkbox" id="hanya-masalah"> Hanya yang perlu dicek</label>
+            <button id="btn-ekspor" class="utama">Unduh CSV</button>
+            <button id="btn-ke-simpan" class="utama" style="background:#15803d; border-color:#15803d;">Lanjut ke Simpan (4) →</button>
+          </div>
+        </div>
+        <div class="baris-kontrol-pilihan">
+          <div class="grup">
+            <span id="badge-pilihan-lembar" class="tag ok" style="font-weight: 700; font-size: 12px; padding: 4px 10px;">0 lembar dipilih</span>
+            <button id="btn-pilih-semua" class="kecil" type="button">Pilih Semua</button>
+            <button id="btn-pilih-aman" class="kecil" type="button" title="Pilih hanya lembar yang berstatus aman">Pilih Aman Saja</button>
+            <button id="btn-batal-pilih" class="kecil" type="button">Batal Pilih</button>
+          </div>
+        </div>
+        <div class="legenda">
+          <span class="lg ok"></span> Aman
+          <span class="lg cek"></span> Perlu dicek
+          <span class="lg edit"></span> Sudah dikoreksi
+          <span class="mono">_</span> kosong &nbsp; <span class="mono">?</span> ganda
+        </div>
+        <div class="tabel-scroll">
+          <table id="tabel-hasil"></table>
+        </div>
+      </div>
+
+      <div class="panel detail-panel">
+        <div id="detail-kosong" class="bantuan">Pilih satu baris di tabel untuk melihat gambarnya.</div>
+        <div id="detail" hidden>
+          <div class="bar-atas">
+            <h3 id="detail-judul"></h3>
+            <select id="detail-bagian"></select>
+          </div>
+          <div id="detail-status" class="info"></div>
+          <div class="kanvas-wrap" id="wrap-detail">
+            <canvas id="kanvas-detail"></canvas>
+            <div class="kontrol-zoom">
+              <button id="dz-in">+</button><button id="dz-out">−</button><button id="dz-pas">⤢</button>
+            </div>
+          </div>
+          <div class="catatan">Klik sebuah bulatan untuk mengubah pilihan kolom tersebut · Klik bulatan yang sama lagi untuk mengosongkan</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 4: SIMPAN ================= -->
+  <section id="tab-simpan" class="tab">
+    <div class="simpan-container">
+      <div class="panel simpan-form-panel">
+        <div class="bar-atas">
+          <h2>4. Simpan & Hit REST API</h2>
+          <div class="grup" style="align-items:center;">
+            <button id="btn-kembali-ke-periksa" class="kecil" title="Kembali ke Step 3 untuk memilih lembar">← Ubah Pilihan Lembar</button>
+            <span id="label-sesi-aktif" class="tag ok" style="display:none;"></span>
+          </div>
+        </div>
+        <p class="petunjuk">Simpan hasil scan ke direktori lokal (gambar lurus & file JSON) serta kirim payload ke REST API DMR untuk diolah.</p>
+
+        <div id="simpan-tanpa-sesi" class="bantuan">
+          Belum ada sesi hasil scan yang aktif di halaman ini.
+          <div style="margin-top:10px; display:flex; gap:8px;">
+            <button id="btn-muat-sesi-terakhir" class="utama kecil">Muat Sesi Terakhir</button>
+            <button onclick="bukaTab('scan')" class="kecil">Buka Tab 2. Scan</button>
+          </div>
+        </div>
+
+        <div id="simpan-konten" hidden>
+          <div class="simpan-info-grid">
+            <div class="kartu-info">
+              <div class="kartu-label">Total Peserta</div>
+              <div class="kartu-nilai" id="simpan-total-peserta">0</div>
+            </div>
+            <div class="kartu-info">
+              <div class="kartu-label">Kode Soal</div>
+              <div class="kartu-nilai" id="simpan-kode-soal">-</div>
+            </div>
+            <div class="kartu-info">
+              <div class="kartu-label">Total Soal Terdeteksi</div>
+              <div class="kartu-nilai" id="simpan-total-soal">0</div>
+            </div>
+            <div class="kartu-info">
+              <div class="kartu-label">Status Lembar</div>
+              <div class="kartu-nilai" id="simpan-status-data">-</div>
+            </div>
+          </div>
+
+          <div class="pemisah"></div>
+
+          <div class="baris">
+            <button id="btn-simpan-kirim" class="utama besar">💾 SIMPAN & KIRIM KE REST API</button>
+          </div>
+          <div class="grup" style="margin-bottom:12px;">
+            <button id="btn-unduh-json" class="kecil">📥 Unduh JSON DMR</button>
+          </div>
+
+          <div id="simpan-proses" class="proses" hidden>
+            <div class="spinner"></div>
+            <div id="simpan-proses-teks">Menyimpan dan mengirim data...</div>
+          </div>
+          <div id="info-simpan" class="info"></div>
+
+          <!-- BLOK HASIL REST API -->
+          <div id="blok-hasil-api" class="hasil-api-box" hidden>
+            <div class="pemisah"></div>
+            <div class="bar-atas">
+              <h3>Hasil Pengolahan REST API</h3>
+              <span id="badge-api-status" class="tag ok">HTTP 201</span>
+            </div>
+            <div id="api-pesan-banner" class="pesan-banner ok"></div>
+            <div id="info-lokal-simpan" class="catatan" style="color:var(--ok); font-weight:600;"></div>
+
+            <div class="tabel-scroll" style="max-height: 260px; margin-top:8px;">
+              <table id="tabel-hasil-api">
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Nomor Peserta</th>
+                    <th>Nama Peserta</th>
+                    <th>Kode</th>
+                    <th>Soal</th>
+                    <th>Benar</th>
+                    <th>Salah</th>
+                    <th>Kosong</th>
+                    <th>Nilai</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-hasil-api"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANEL KANAN: PREVIEW -->
+      <div class="panel simpan-preview-panel">
+        <div class="bar-atas">
+          <h3>Pratinjau Data yang Dikirim</h3>
+          <div class="grup">
+            <button id="btn-tab-preview-tabel" class="kecil preview-btn aktif">Tabel</button>
+            <button id="btn-tab-preview-json" class="kecil preview-btn">Format JSON DMR</button>
+          </div>
+        </div>
+
+        <div id="wrap-preview-tabel" class="preview-konten" style="height: calc(100% - 40px); display: flex; flex-direction: column;">
+          <div class="tabel-scroll" style="flex: 1;">
+            <table id="tabel-preview-dmr">
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Lembar</th>
+                  <th>Nomor Peserta</th>
+                  <th>Nama Peserta</th>
+                  <th>Kode Soal</th>
+                  <th>Jml Soal</th>
+                  <th>Ringkasan Jawaban</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-preview-dmr"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="wrap-preview-json" class="preview-konten" hidden style="height: calc(100% - 40px); display: flex; flex-direction: column;">
+          <pre id="kode-json-preview" class="json-box"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast"></div>
+<script src="/static/app.js?v=4"></script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+================================================================================
+   PANDUAN MEMBUAT & MENJALANKAN FILE .EXE UNTUK WINDOWS (LJK READER)
+================================================================================
+
+1. KENAPA PERLU DILAKUKAN DI WINDOWS?
+-------------------------------------
+PyInstaller bukan cross-compiler. Library seperti OpenCV, PyMuPDF, Uvicorn, dan
+Python itu sendiri memerlukan file binary sistem (.dll untuk Windows, .so untuk Linux).
+Oleh karena itu, file .exe untuk Windows harus di-build di lingkungan Windows
+(atau menggunakan cloud runner Windows seperti GitHub Actions).
+
+
+2. CARA BUILD DI WINDOWS (1 KLIK)
+---------------------------------
+Folder "windows_build" ini dirancang khusus agar proses build TIDAK MENGOTORI
+folder utama proyek Anda. Semua file temporary build, dist, dan venv Windows
+akan berada di dalam folder "windows_build/".
+
+Langkah-langkah:
+a. Salin atau ekstrak seluruh folder proyek ini ke komputer Windows Anda.
+b. Pastikan komputer Windows sudah terinstall Python (versi 3.10 - 3.12 disarankan):
+   - Unduh di https://www.python.org/downloads/
+   - PENTING: Saat install, centang pilihan "Add Python to PATH".
+c. Buka folder "windows_build".
+d. Klik ganda (double-click) file "build.bat" atau jalankan via Command Prompt:
+       build.bat
+e. Script akan otomatis:
+   - Membuat virtual environment khusus di windows_build\venv_win
+   - Menginstall semua library yang dibutuhkan
+   - Mengemas aplikasi menjadi file tunggal: windows_build\dist\LJK_Reader.exe
+
+
+3. CARA MENDISTRIBUSIKAN & MENJALANKAN .EXE
+------------------------------------------
+a. File hasil akhir ada di:
+   windows_build\dist\LJK_Reader.exe
+
+b. Anda cukup menyalin file "LJK_Reader.exe" tersebut ke mana saja di komputer
+   pengguna (misalnya di folder C:\LJK_Reader\).
+
+c. (Opsional) Konfigurasi REST API:
+   Jika Anda ingin mengarahkan API URL, cukup buat file ".env" di sebelah file
+   "LJK_Reader.exe" dengan isi misalnya:
+       api_url=https://alamat-api-anda.com/endpoint
+
+d. Klik ganda "LJK_Reader.exe" untuk menjalankan:
+   - Aplikasi akan otomatis membuka browser ke http://127.0.0.1:8000
+   - Terminal/Console akan terbuka untuk menampilkan status server dan log.
+   - Folder penyimpanan data ("data" dan "hasil_scan_gambar") akan otomatis
+     dibuat di sebelah file "LJK_Reader.exe".
+
+
+4. PENGGUNAAN SCANNER HARDWARE DI WINDOWS
+----------------------------------------
+Aplikasi ini sudah mendukung scanner ADF di Windows melalui NAPS2.
+- Jika pengguna ingin scan langsung dari mesin scanner melalui aplikasi,
+  install software gratis NAPS2 dari: https://www.naps2.com/
+- Jika tidak ada scanner fisik yang terhubung, pengguna tetap bisa menggunakan
+  fitur "Unggah Gambar / File PDF" langsung dari tampilan web.
+================================================================================
