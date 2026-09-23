@@ -48,7 +48,7 @@ from typing import Any, Optional
 
 import numpy as np
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -318,7 +318,7 @@ def muat_sesi(sesi_id: str):
 
 # ======================= 4. SIMPAN & HIT REST API =======================
 @app.post("/api/simpan-dmr")
-def simpan_dmr(body: SimpanDmrIn):
+def simpan_dmr(body: SimpanDmrIn, request: Request):
     waktu_obj = datetime.datetime.now()
     waktu_str = waktu_obj.strftime("%Y%m%d_%H%M%S")
     sesi_id = body.sesi or "manual"
@@ -363,20 +363,49 @@ def simpan_dmr(body: SimpanDmrIn):
 
     if url:
         try:
+            # Pakai User-Agent sesuai browser klien yang memanggil endpoint (misal Chrome / Edge)
+            browser_ua = request.headers.get("user-agent") or (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+            )
+            req_headers = {
+                "Content-Type": "application/json",
+                "User-Agent": browser_ua,
+                "Accept": "application/json, text/plain, */*",
+            }
+            accept_lang = request.headers.get("accept-language")
+            if accept_lang:
+                req_headers["Accept-Language"] = accept_lang
+
             data_bytes = json.dumps(cleaned_data, ensure_ascii=False).encode("utf-8")
             req = urllib.request.Request(
                 url,
                 data=data_bytes,
-                headers={"Content-Type": "application/json"},
+                headers=req_headers,
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                api_status_code = resp.getcode()
-                body_bytes = resp.read()
-                try:
-                    api_hasil = json.loads(body_bytes.decode("utf-8"))
-                except Exception:
-                    api_hasil = {"raw": body_bytes.decode("utf-8", errors="replace")}
+            
+            import ssl
+            ssl_ctx = ssl.create_default_context()
+            try:
+                with urllib.request.urlopen(req, timeout=15, context=ssl_ctx) as resp:
+                    api_status_code = resp.getcode()
+                    body_bytes = resp.read()
+                    try:
+                        api_hasil = json.loads(body_bytes.decode("utf-8"))
+                    except Exception:
+                        api_hasil = {"raw": body_bytes.decode("utf-8", errors="replace")}
+            except urllib.error.URLError as ssl_err:
+                if "CERTIFICATE_VERIFY_FAILED" in str(ssl_err):
+                    unverified_ctx = ssl._create_unverified_context()
+                    with urllib.request.urlopen(req, timeout=15, context=unverified_ctx) as resp:
+                        api_status_code = resp.getcode()
+                        body_bytes = resp.read()
+                        try:
+                            api_hasil = json.loads(body_bytes.decode("utf-8"))
+                        except Exception:
+                            api_hasil = {"raw": body_bytes.decode("utf-8", errors="replace")}
+                else:
+                    raise
         except urllib.error.HTTPError as e:
             api_status_code = e.code
             err_bytes = e.read()
