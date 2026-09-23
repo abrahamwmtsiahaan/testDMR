@@ -52,9 +52,22 @@ d. Klik ganda "LJK_Reader.exe" untuk menjalankan:
 
 4. PENGGUNAAN SCANNER HARDWARE DI WINDOWS
 ----------------------------------------
-Aplikasi ini sudah mendukung scanner ADF di Windows melalui NAPS2.
-- Jika pengguna ingin scan langsung dari mesin scanner melalui aplikasi,
-  install software gratis NAPS2 dari: https://www.naps2.com/
-- Jika tidak ada scanner fisik yang terhubung, pengguna tetap bisa menggunakan
-  fitur "Unggah Gambar / File PDF" langsung dari tampilan web.
+Aplikasi ini mendukung pemindaian langsung dari scanner fisik (Flatbed maupun ADF)
+di Windows menggunakan bantuan software NAPS2.
+
+Langkah konfigurasi scanner di Windows:
+a. Unduh dan install software gratis NAPS2 dari: https://www.naps2.com/
+b. Sambungkan scanner Anda ke laptop/PC dengan kabel USB/WiFi dan nyalakan scanner.
+c. Buka aplikasi "NAPS2" di Windows:
+   - Klik tombol "Profiles" di bagian atas.
+   - Klik "New".
+   - Beri nama profil (misal: "Scanner LJK").
+   - Klik "Choose Device", pilih scanner Anda (bisa driver WIA atau TWAIN).
+   - Pada pilihan "Paper Source", pilih "Feeder" jika menggunakan ADF atau "Flatbed/Glass" jika kaca flatbed.
+   - Klik OK, lalu Save.
+d. Jalankan kembali "LJK_Reader.exe". Sekarang tombol "Scan lembar contoh" dan "MULAI SCAN"
+   sudah dapat langsung memindai dari scanner Anda.
+e. Jika tidak ada scanner fisik terhubung, pengguna tetap dapat menggunakan
+   fitur "Unggah Gambar / File PDF" langsung dari browser.
 ================================================================================
+
