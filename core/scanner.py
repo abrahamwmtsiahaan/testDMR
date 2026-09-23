@@ -177,15 +177,20 @@ class ScannerNAPS2(ScannerBase):
         profil_tersimpan = self._baca_daftar_profil(exe)
         for prof in profil_tersimpan:
             nama_p = prof["name"]
-            # Coba feeder
+            # Coba sesuai konfigurasi profil
             perintah_kandidat.append([exe, "-o", keluaran, "-p", nama_p, "--source", "feeder", "--dpi", str(dpi), "--force"])
+            # Fallback TWAIN (scanner Brother di Windows sangat stabil menggunakan driver TWAIN)
+            perintah_kandidat.append([exe, "-o", keluaran, "-p", nama_p, "--driver", "twain", "--source", "feeder", "--dpi", str(dpi), "--force"])
+            perintah_kandidat.append([exe, "-o", keluaran, "-p", nama_p, "--driver", "wia", "--source", "feeder", "--dpi", str(dpi), "--force"])
             # Jika 1 lembar atau feeder tidak ada/kosong, coba glass / tanpa argumen source
             if jumlah == 1:
                 perintah_kandidat.append([exe, "-o", keluaran, "-p", nama_p, "--source", "glass", "--dpi", str(dpi), "--force"])
+                perintah_kandidat.append([exe, "-o", keluaran, "-p", nama_p, "--driver", "twain", "--source", "glass", "--dpi", str(dpi), "--force"])
                 perintah_kandidat.append([exe, "-o", keluaran, "-p", nama_p, "--dpi", str(dpi), "--force"])
 
         # 2. Gunakan profil default / most-recently-used di NAPS2 tanpa flag --profile
         perintah_kandidat.append([exe, "-o", keluaran, "--source", "feeder", "--dpi", str(dpi), "--force"])
+        perintah_kandidat.append([exe, "-o", keluaran, "--driver", "twain", "--source", "feeder", "--dpi", str(dpi), "--force"])
         if jumlah == 1:
             perintah_kandidat.append([exe, "-o", keluaran, "--source", "glass", "--dpi", str(dpi), "--force"])
             perintah_kandidat.append([exe, "-o", keluaran, "--dpi", str(dpi), "--force"])
@@ -194,6 +199,8 @@ class ScannerNAPS2(ScannerBase):
         devices = self._cari_device_cli(exe)
         for drv, dev_name in devices:
             perintah_kandidat.append([exe, "-o", keluaran, "--noprofile", "--driver", drv, "--device", dev_name, "--source", "feeder", "--dpi", str(dpi), "--force"])
+            if drv != "twain":
+                perintah_kandidat.append([exe, "-o", keluaran, "--noprofile", "--driver", "twain", "--device", dev_name, "--source", "feeder", "--dpi", str(dpi), "--force"])
             if jumlah == 1:
                 perintah_kandidat.append([exe, "-o", keluaran, "--noprofile", "--driver", drv, "--device", dev_name, "--source", "glass", "--dpi", str(dpi), "--force"])
                 perintah_kandidat.append([exe, "-o", keluaran, "--noprofile", "--driver", drv, "--device", dev_name, "--dpi", str(dpi), "--force"])
@@ -232,6 +239,16 @@ class ScannerNAPS2(ScannerBase):
                 "1. Pastikan kabel USB scanner terhubung ke laptop/PC & scanner sudah menyala.\n"
                 "2. Buka aplikasi NAPS2 di Windows, klik menu 'Profiles' -> 'New', pilih scanner Anda lalu klik 'Save'.\n"
                 "3. Atau gunakan tombol 'Unggah gambar' jika ingin mengunggah file hasil scan secara manual."
+            )
+        elif "could not be found" in pesan_error_terakhir.lower() or "not found" in pesan_error_terakhir.lower():
+            raise ScannerError(
+                "Scanner Brother tidak ditemukan oleh sistem ('The selected scanner could not be found').\n"
+                "Solusi:\n"
+                "1. Buka aplikasi NAPS2 (ada di taskbar Anda) -> klik Profiles -> klik Edit profil Brother:\n"
+                "   - Ubah Driver dari WIA ke TWAIN.\n"
+                "   - Klik tombol 'Choose Device' dan pilih 'TW-Brother...'.\n"
+                "2. Pastikan aplikasi VueScan sudah DITUTUP agar koneksi USB tidak terkunci.\n"
+                "3. ATAU CARA TERCEPAT: Scan dari VueScan, lalu cukup klik tombol 'Unggah gambar' di samping."
             )
         elif "feeder" in pesan_error_terakhir.lower() and ("empty" in pesan_error_terakhir.lower() or "paper" in pesan_error_terakhir.lower()):
             raise ScannerError("Kertas tidak terdeteksi di ADF (Feeder). Masukkan lembar kertas ke penampung ADF scanner lalu coba lagi.")
