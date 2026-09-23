@@ -632,7 +632,11 @@ async function muatDaftarTemplate() {
     sel.innerHTML = daftar.length
       ? daftar.map((n) => `<option>${n}</option>`).join("")
       : `<option value="">(belum ada)</option>`;
-    if (daftar.includes(lama)) sel.value = lama;
+    if (daftar.includes(lama)) {
+      sel.value = lama;
+    } else if (daftar.includes("LJK PPTSB")) {
+      sel.value = "LJK PPTSB";
+    }
   }
 }
 

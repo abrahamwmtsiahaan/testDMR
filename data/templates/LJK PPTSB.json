@@ -1,0 +1,163 @@
+{
+  "nama": "LJK PPTSB",
+  "kriteria": [
+    {
+      "nama": "nama_peserta",
+      "arah_baca": "vertikal",
+      "jumlah_kolom": 22,
+      "jumlah_baris": 26,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+        "S",
+        "T",
+        "U",
+        "V",
+        "W",
+        "X",
+        "Y",
+        "Z"
+      ],
+      "grid": {
+        "x0": 118.5759270516762,
+        "y0": 1008.6021340452049,
+        "dx": 51.627324840698975,
+        "dy": 52.60707066438042
+      }
+    },
+    {
+      "nama": "nomor_peserta",
+      "arah_baca": "vertikal",
+      "jumlah_kolom": 12,
+      "jumlah_baris": 10,
+      "jenis_label": "angka0",
+      "label_kustom": "",
+      "label_baris": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "grid": {
+        "x0": 1564.023838005648,
+        "y0": 1062.243962670013,
+        "dx": 51.10065145970529,
+        "dy": 52.5317808156544
+      }
+    },
+    {
+      "nama": "kode_soal",
+      "arah_baca": "vertikal",
+      "jumlah_kolom": 3,
+      "jumlah_baris": 10,
+      "jenis_label": "angka0",
+      "label_kustom": "",
+      "label_baris": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "grid": {
+        "x0": 2229.3123194755644,
+        "y0": 1063.7839823030451,
+        "dx": 51.59065770657912,
+        "dy": 52.70289410821354
+      }
+    },
+    {
+      "nama": "1",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 1,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 221.02621511716663,
+        "y0": 2636.8272857091806,
+        "dx": 51.42606810829883,
+        "dy": 51.42606810829883
+      }
+    },
+    {
+      "nama": "2",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 1,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 218.9895391524815,
+        "y0": 2693.8542127203636,
+        "dx": 52.44440609064139,
+        "dy": 52.44440609064139
+      }
+    },
+    {
+      "nama": "3",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 1,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 223.06289108185172,
+        "y0": 2742.734435872806,
+        "dx": 51.935237099470115,
+        "dy": 51.935237099470115
+      }
+    }
+  ],
+  "contoh": "/media/contoh/8745011a58b6.png"
+}

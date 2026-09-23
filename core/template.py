@@ -38,8 +38,48 @@ def _path(nama: str) -> Path:
     return TEMPLATE_DIR / f"{_nama_aman(nama)}.json"
 
 
+def inisialisasi_template_bawaan() -> None:
+    """
+    Memastikan template default (khususnya 'LJK PPTSB.json') selalu tersedia di TEMPLATE_DIR.
+    Mencari berkas dari direktori kerja, folder eksekusi .exe, atau bundled data PyInstaller.
+    """
+    TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
+    target = TEMPLATE_DIR / "LJK PPTSB.json"
+    if target.exists() and target.stat().st_size > 0:
+        return
+
+    # Cari kandidat sumber LJK PPTSB.json
+    kandidat = [
+        Path.cwd() / "LJK PPTSB.json",
+        Path.cwd() / "data" / "templates" / "LJK PPTSB.json",
+    ]
+    if getattr(sys, "frozen", False):
+        kandidat.extend([
+            Path(sys._MEIPASS) / "LJK PPTSB.json",
+            Path(os.path.dirname(sys.executable)) / "LJK PPTSB.json",
+            Path(os.path.dirname(sys.executable)) / "data" / "templates" / "LJK PPTSB.json",
+        ])
+    else:
+        root_dir = Path(__file__).resolve().parents[1]
+        kandidat.extend([
+            root_dir / "LJK PPTSB.json",
+            root_dir / "data" / "templates" / "LJK PPTSB.json",
+        ])
+
+    for k in kandidat:
+        if k.is_file():
+            try:
+                isi = k.read_text(encoding="utf-8")
+                json.loads(isi)
+                target.write_text(isi, encoding="utf-8")
+                return
+            except Exception:
+                pass
+
+
 def daftar_template() -> list[str]:
     """Nama semua template tersimpan, urut abjad."""
+    inisialisasi_template_bawaan()
     TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
     return sorted(p.stem for p in TEMPLATE_DIR.glob("*.json"))
 
@@ -101,6 +141,7 @@ def simpan_template(
 
 
 def muat_template(nama: str) -> dict[str, Any]:
+    inisialisasi_template_bawaan()
     p = _path(nama)
     if not p.exists():
         raise TemplateError(f"Template '{nama}' tidak ditemukan.")

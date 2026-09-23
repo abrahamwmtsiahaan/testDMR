@@ -54,6 +54,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
+:: Salin file template default LJK PPTSB.json ke folder dist
+if exist "..\LJK PPTSB.json" copy /y "..\LJK PPTSB.json" "dist\" >nul 2>&1
+
 echo.
 echo ========================================================
 echo  BUILD BERHASIL!
