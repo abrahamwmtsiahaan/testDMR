@@ -317,6 +317,28 @@ def muat_sesi(sesi_id: str):
 
 
 # ======================= 4. SIMPAN & HIT REST API =======================
+def normalisasi_jawaban_all(jawaban_all: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Pastikan setiap butir soal berdiri sendiri (nomor_soal 1..n), jika jawaban_siswa masih tergabung (mis. 'BDCDC')."""
+    hasil = []
+    for item in (jawaban_all or []):
+        no_soal = item.get("nomor_soal")
+        jawaban = str(item.get("jawaban_siswa") or "").strip()
+        if len(jawaban) > 1 and no_soal is not None:
+            for idx, ch in enumerate(jawaban):
+                ch_clean = "" if ch in ("_", " ") else ch
+                hasil.append({
+                    "nomor_soal": int(no_soal) + idx,
+                    "jawaban_siswa": ch_clean,
+                })
+        else:
+            hasil.append({
+                "nomor_soal": int(no_soal) if no_soal is not None else 0,
+                "jawaban_siswa": "" if jawaban in ("_", " ") else jawaban,
+            })
+    hasil.sort(key=lambda x: x["nomor_soal"])
+    return hasil
+
+
 @app.post("/api/simpan-dmr")
 def simpan_dmr(body: SimpanDmrIn, request: Request):
     waktu_obj = datetime.datetime.now()
@@ -359,6 +381,8 @@ def simpan_dmr(body: SimpanDmrIn, request: Request):
     cleaned_data = []
     for p in body.data:
         cleaned_item = {k: v for k, v in p.items() if k not in ("no_lembar", "lembar_no")}
+        if "jawaban_all" in cleaned_item and isinstance(cleaned_item["jawaban_all"], list):
+            cleaned_item["jawaban_all"] = normalisasi_jawaban_all(cleaned_item["jawaban_all"])
         cleaned_data.append(cleaned_item)
 
     if url:

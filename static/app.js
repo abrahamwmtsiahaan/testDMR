@@ -1337,6 +1337,12 @@ function formatDmrPayload(sesi, templateSesi, lembarDipilih) {
     "kode_paket",
     "paket",
     "kode",
+    "kelas",
+    "jurusan",
+    "ruang",
+    "tanggal",
+    "tgl_lahir",
+    "status",
   ]);
 
   const daftarLembar = sesi.lembar.filter((l) =>
@@ -1371,8 +1377,8 @@ function formatDmrPayload(sesi, templateSesi, lembarDipilih) {
     kodeSoal = (kodeSoal || "").replace(/_+$/, "").trim();
     if (!kodeSoal) kodeSoal = "101";
 
-    // 4. Jawaban all
-    const jawabanAll = [];
+    // 4. Jawaban all (otomatis pisahkan blok rentang soal misal 1_5, 6_10, 11_15)
+    const mapJawaban = new Map();
     const namaKriteriaList =
       kriteria.length > 0
         ? kriteria.map((k) => k.nama)
@@ -1381,25 +1387,69 @@ function formatDmrPayload(sesi, templateSesi, lembarDipilih) {
     for (const kName of namaKriteriaList) {
       if (nonSoal.has(kName.toLowerCase())) continue;
 
-      let noSoal = null;
-      if (/^\d+$/.test(kName.trim())) {
-        noSoal = parseInt(kName.trim(), 10);
-      } else {
-        const m = kName.match(/(?:soal|no|nomor|q)?[_\s-]*(\d+)$/i);
-        if (m) noSoal = parseInt(m[1], 10);
+      const rawJawaban = String(l.teks[kName] ?? "");
+
+      // Cek apakah format rentang soal, misal: 1_5, 6_10, 11_15, 1-5, soal_1_5, no_1_5, dll.
+      const mRange = kName
+        .trim()
+        .match(
+          /^(?:soal|no|nomor|q)?[_\s-]*(\d+)\s*(?:_|-|sd|sampai|to|\.{2,})\s*(\d+)$/i,
+        );
+      if (mRange) {
+        const startNo = parseInt(mRange[1], 10);
+        const endNo = parseInt(mRange[2], 10);
+        const step = startNo <= endNo ? 1 : -1;
+        const count = Math.abs(endNo - startNo) + 1;
+        const totalItems = Math.max(count, rawJawaban.length);
+
+        for (let i = 0; i < totalItems; i++) {
+          const noSoal = startNo + i * step;
+          const ch = i < rawJawaban.length ? rawJawaban[i] : "";
+          const jawaban = ch === "_" || ch === " " ? "" : ch.trim();
+          if (!mapJawaban.has(noSoal) || (jawaban && !mapJawaban.get(noSoal))) {
+            mapJawaban.set(noSoal, jawaban);
+          }
+        }
+        continue;
       }
 
-      if (noSoal !== null) {
-        let rawJawaban = l.teks[kName] ?? "";
-        let jawaban = rawJawaban === "_" ? "" : rawJawaban.trim();
-        jawabanAll.push({
-          nomor_soal: noSoal,
-          jawaban_siswa: jawaban,
-        });
+      // Cek apakah format nomor tunggal, misal: 1, soal_1, no-1, q1, dll.
+      const mSingle = kName.trim().match(/^(?:soal|no|nomor|q)?[_\s-]*(\d+)$/i);
+      if (mSingle) {
+        const startNo = parseInt(mSingle[1], 10);
+        if (rawJawaban.length > 1) {
+          // Jika jawaban berisi banyak karakter (misal gabungan beberapa soal tanpa format rentang di nama)
+          for (let i = 0; i < rawJawaban.length; i++) {
+            const noSoal = startNo + i;
+            const ch = rawJawaban[i];
+            const jawaban = ch === "_" || ch === " " ? "" : ch.trim();
+            if (
+              !mapJawaban.has(noSoal) ||
+              (jawaban && !mapJawaban.get(noSoal))
+            ) {
+              mapJawaban.set(noSoal, jawaban);
+            }
+          }
+        } else {
+          const jawaban =
+            rawJawaban === "_" || rawJawaban === " " ? "" : rawJawaban.trim();
+          if (
+            !mapJawaban.has(startNo) ||
+            (jawaban && !mapJawaban.get(startNo))
+          ) {
+            mapJawaban.set(startNo, jawaban);
+          }
+        }
+        continue;
       }
     }
 
-    jawabanAll.sort((a, b) => a.nomor_soal - b.nomor_soal);
+    const jawabanAll = Array.from(mapJawaban.entries())
+      .map(([nomor_soal, jawaban_siswa]) => ({
+        nomor_soal,
+        jawaban_siswa,
+      }))
+      .sort((a, b) => a.nomor_soal - b.nomor_soal);
 
     return {
       no_lembar: l.no,
@@ -1420,6 +1470,10 @@ function renderTabSimpan() {
     tanpaSesi.hidden = false;
     konten.hidden = true;
     lblSesi.style.display = "none";
+    const theadEl = $("#thead-preview-dmr") || $("#tabel-preview-dmr thead");
+    if (theadEl) {
+      theadEl.innerHTML = `<tr><th style="text-align:center; width:44px;">No</th><th>Lembar</th><th>Nomor Peserta</th><th>Nama Peserta</th><th style="text-align:center;">Kode Soal</th><th style="text-align:center;">Jml Soal</th><th>Jawaban Siswa</th></tr>`;
+    }
     $("#tbody-preview-dmr").innerHTML = "";
     $("#kode-json-preview").textContent = "[]";
     return;
@@ -1469,25 +1523,90 @@ function renderTabSimpan() {
     statusEl.style.color = "var(--ok)";
   }
 
+  // Kumpulkan semua nomor soal unik untuk header JAWABAN SISWA
+  const daftarSoal = [
+    ...new Set(
+      payload.flatMap((p) => p.jawaban_all.map((j) => j.nomor_soal)),
+    ),
+  ].sort((a, b) => a - b);
+
+  // Render Header Tabel Preview
+  const theadEl = $("#thead-preview-dmr") || $("#tabel-preview-dmr thead");
+  if (theadEl) {
+    if (daftarSoal.length > 0) {
+      theadEl.innerHTML = `
+        <tr>
+          <th rowspan="2" style="text-align:center; width:44px;">No</th>
+          <th rowspan="2">Lembar</th>
+          <th rowspan="2">Nomor Peserta</th>
+          <th rowspan="2">Nama Peserta</th>
+          <th rowspan="2" style="text-align:center;">Kode Soal</th>
+          <th rowspan="2" style="text-align:center;">Jml Soal</th>
+          <th colspan="${daftarSoal.length}" class="th-jawaban-utama">JAWABAN SISWA</th>
+        </tr>
+        <tr>
+          ${daftarSoal
+            .map((no) => `<th class="th-soal-no">${no}</th>`)
+            .join("")}
+        </tr>
+      `;
+    } else {
+      theadEl.innerHTML = `
+        <tr>
+          <th style="text-align:center; width:44px;">No</th>
+          <th>Lembar</th>
+          <th>Nomor Peserta</th>
+          <th>Nama Peserta</th>
+          <th>Kode Soal</th>
+          <th>Jml Soal</th>
+          <th>Jawaban Siswa</th>
+        </tr>
+      `;
+    }
+  }
+
   // Render Preview Table
   let htmlTable = "";
   if (payload.length === 0) {
-    htmlTable = `<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--redup);">
+    const totalCols = 6 + (daftarSoal.length || 1);
+    htmlTable = `<tr><td colspan="${totalCols}" style="text-align:center; padding:20px; color:var(--redup);">
       Tidak ada lembar yang dipilih. <button onclick="bukaTab('periksa')" class="kecil" style="margin-left:8px;">Buka Step 3 untuk Pilih Lembar</button>
     </td></tr>`;
   } else {
     payload.forEach((p, idx) => {
-      const ringkasanJawaban = p.jawaban_all
-        .map((j) => `${j.nomor_soal}:${j.jawaban_siswa || "_"}`)
-        .join(" ");
+      const mapJwb = new Map(
+        p.jawaban_all.map((j) => [j.nomor_soal, j.jawaban_siswa]),
+      );
+
+      let selJawabanHtml = "";
+      if (daftarSoal.length > 0) {
+        selJawabanHtml = daftarSoal
+          .map((no) => {
+            const ans = mapJwb.get(no) ?? "";
+            if (ans === "?") {
+              return `<td class="td-jawaban-siswa"><span class="tag-ambigu">?</span></td>`;
+            } else if (!ans || ans === "_") {
+              return `<td class="td-jawaban-siswa"><span class="tag-kosong">_</span></td>`;
+            } else {
+              return `<td class="td-jawaban-siswa">${escapeHtml(ans)}</td>`;
+            }
+          })
+          .join("");
+      } else {
+        const ringkasanJawaban = p.jawaban_all
+          .map((j) => `${j.nomor_soal}:${j.jawaban_siswa || "_"}`)
+          .join(" ");
+        selJawabanHtml = `<td class="mono" style="max-width:260px; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(ringkasanJawaban)}">${escapeHtml(ringkasanJawaban)}</td>`;
+      }
+
       htmlTable += `<tr>
-        <td>${idx + 1}</td>
+        <td style="text-align:center;">${idx + 1}</td>
         <td><span class="tag ok" style="font-size:11px; font-weight:600;">Lembar ${p.no_lembar || idx + 1}</span></td>
         <td class="mono font-bold">${escapeHtml(p.nomor_peserta)}</td>
         <td>${escapeHtml(p.nama_peserta)}</td>
-        <td><span class="mono">${escapeHtml(p.kode_soal)}</span></td>
-        <td>${p.jawaban_all.length}</td>
-        <td class="mono" style="max-width:260px; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(ringkasanJawaban)}">${escapeHtml(ringkasanJawaban)}</td>
+        <td style="text-align:center;"><span class="mono">${escapeHtml(p.kode_soal)}</span></td>
+        <td style="text-align:center;">${p.jawaban_all.length}</td>
+        ${selJawabanHtml}
       </tr>`;
     });
   }
