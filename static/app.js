@@ -1428,6 +1428,9 @@ function renderTabSimpan() {
   tanpaSesi.hidden = true;
   konten.hidden = false;
   lblSesi.style.display = "inline-block";
+  if (!$("#btn-simpan-kirim").disabled) {
+    $("#simpan-proses").hidden = true;
+  }
 
   const totalSemua = S.sesi.lembar.length;
   const terpilihCount = S.lembarDipilih ? S.lembarDipilih.size : totalSemua;

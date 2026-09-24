@@ -12,6 +12,7 @@
   --edit: #2563eb;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -216,3 +217,4 @@ tbody tr.tidak-dipilih:hover {
 .pesan-banner.ok { background: #e6f6ec; border: 1px solid #b7e3c7; color: #15803d; }
 .pesan-banner.err { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
 .badge-nilai { font-weight: 700; font-size: 14px; color: var(--utama-gelap); }
+.preview-konten { height: calc(100% - 40px); display: flex; flex-direction: column; }
