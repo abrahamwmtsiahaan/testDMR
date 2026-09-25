@@ -54,8 +54,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Salin file template default LJK PPTSB.json ke folder dist
+:: Salin file template default LJK PPTSB.json dan .env ke folder dist jika ada
 if exist "..\LJK PPTSB.json" copy /y "..\LJK PPTSB.json" "dist\" >nul 2>&1
+if exist "..\.env" copy /y "..\.env" "dist\" >nul 2>&1
 
 echo.
 echo ========================================================

@@ -32,9 +32,22 @@ jobs:
         run: |
           pyinstaller --noconfirm --workpath windows_build/build --distpath windows_build/dist windows_build/app.spec
 
+      - name: Create .env in dist folder
+        shell: bash
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          # Gunakan secret API_URL jika diset di GitHub Secrets,
+          # jika belum diset fallback ke URL staging default agar build tetap siap pakai.
+          URL_VAL="${API_URL:-https://api-superapps-stg.ganeshaoperationexpert.com}"
+          echo "api_url=${URL_VAL}" > windows_build/dist/.env
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LJK_Reader_Windows_EXE
-          path: windows_build/dist/LJK_Reader.exe
+          name: LJK_Reader_Windows
+          path: |
+            windows_build/dist/LJK_Reader.exe
+            windows_build/dist/.env
           if-no-files-found: error
+

@@ -157,6 +157,111 @@
         "dx": 51.73665134611099,
         "dy": 52.692755048251456
       }
+    },
+    {
+      "nama": "16_20",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 675.1552014891656,
+        "y0": 2955.1503474920964,
+        "dx": 51.85878050384608,
+        "dy": 51.12837514463706
+      }
+    },
+    {
+      "nama": "21_25",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 1144.988631401759,
+        "y0": 2638.804299763704,
+        "dx": 51.49357782424153,
+        "dy": 52.954388542659785
+      }
+    },
+    {
+      "nama": "26_30",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 1143.8027306248255,
+        "y0": 2949.4554814965254,
+        "dx": 51.639244677543104,
+        "dy": 53.2961188383199
+      }
+    },
+    {
+      "nama": "31_35",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 1609.9595213682985,
+        "y0": 2636.0776227397005,
+        "dx": 51.798731365616504,
+        "dy": 52.7962500114503
+      }
+    },
+    {
+      "nama": "36_40",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 1609.5354106089142,
+        "y0": 2951.7313867291127,
+        "dx": 51.36623107134079,
+        "dy": 52.827871792883
+      }
     }
   ],
   "contoh": "/media/contoh/d8183ed13198.png"
