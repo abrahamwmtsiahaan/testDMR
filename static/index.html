@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LJK Reader</title>
-<link rel="stylesheet" href="/static/style.css?v=7">
+<link rel="stylesheet" href="/static/style.css?v=9">
 </head>
 <body>
 
@@ -286,7 +286,19 @@
 
 </main>
 
+<!-- Modal Dialog Peringatan / Konfirmasi -->
+<div id="modal-dialog" class="modal-backdrop" hidden>
+  <div class="modal-kotak">
+    <div class="modal-header">
+      <div id="modal-ikon" class="modal-ikon warning">⚠️</div>
+      <h3 id="modal-judul" class="modal-judul">Konfirmasi</h3>
+    </div>
+    <div id="modal-pesan" class="modal-pesan"></div>
+    <div id="modal-aksi" class="modal-aksi"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
-<script src="/static/app.js?v=8"></script>
+<script src="/static/app.js?v=9"></script>
 </body>
 </html>

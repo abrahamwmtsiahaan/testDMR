@@ -289,3 +289,149 @@ tbody tr.tidak-dipilih:hover {
   padding: 0 4px;
   border-radius: 3px;
 }
+
+/* ---------- Modal Dialog ---------- */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: modalFadeIn 0.15s ease-out;
+}
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.modal-kotak {
+  background: #ffffff;
+  border-radius: 14px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+  padding: 22px 24px;
+  border: 1px solid var(--garis);
+  animation: modalScaleUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes modalScaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.modal-ikon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.modal-ikon.warning {
+  background: #fef3c7;
+  color: #b45309;
+}
+.modal-ikon.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.modal-ikon.info {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.modal-ikon.sukses {
+  background: #dcfce7;
+  color: #15803d;
+}
+.modal-judul {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--teks);
+}
+.modal-pesan {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #374151;
+  margin-bottom: 20px;
+}
+.modal-pesan b {
+  color: var(--teks);
+}
+.modal-pesan .highlight-box {
+  background: #fff8f1;
+  border-left: 3px solid var(--utama);
+  padding: 8px 12px;
+  margin-top: 12px;
+  border-radius: 0 6px 6px 0;
+  font-size: 13px;
+  color: #8c4205;
+  line-height: 1.45;
+}
+.modal-aksi {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.modal-aksi button {
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.modal-aksi button.btn-batal {
+  background: #fff;
+  border: 1px solid var(--garis);
+  color: #4b5563;
+}
+.modal-aksi button.btn-batal:hover {
+  background: #f3f4f6;
+  color: var(--teks);
+}
+.modal-aksi button.btn-danger {
+  background: var(--bahaya);
+  border: 1px solid var(--bahaya);
+  color: #fff;
+}
+.modal-aksi button.btn-danger:hover {
+  background: #b91c1c;
+}
+.modal-aksi button.btn-sekunder {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--redup);
+  font-weight: 500;
+  text-decoration: underline;
+  padding: 9px 10px;
+}
+.modal-aksi button.btn-sekunder:hover {
+  color: var(--teks);
+  background: #f3f4f6;
+}
+
+@keyframes sorotPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(232, 115, 12, 0.7); }
+  50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(232, 115, 12, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(232, 115, 12, 0); }
+}
+.sorot-simpan {
+  animation: sorotPulse 0.8s ease-in-out 2;
+  outline: 3px solid var(--utama) !important;
+}
+

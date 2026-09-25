@@ -23,7 +23,7 @@ MARKER_MAX_FRAKSI = 0.035
 MARKER_RASIO_MIN = 0.6
 MARKER_RASIO_MAX = 1.6
 MARKER_KEPADATAN_MIN = 0.55  # luas kontur / luas bounding box
-AREA_MIN_FRAKSI = 0.25  # luas segiempat marker minimal thd luas gambar
+AREA_MIN_FRAKSI = 0.45  # luas segiempat marker minimal thd luas gambar (harus mencakup sebagian besar halaman)
 
 # Threshold yang dicoba berurutan saat mencari marker (None = Otsu)
 DAFTAR_THRESHOLD = (None, 110, 90, 70, 130)
@@ -143,11 +143,25 @@ def _pilih_empat_sudut(pts: np.ndarray) -> np.ndarray | None:
 
 
 def _valid_segiempat(sudut: np.ndarray, lebar: int, tinggi: int) -> bool:
-    """Cek 4 titik masuk akal: berbeda, luas cukup besar, sisi berhadapan mirip."""
+    """Cek 4 titik masuk akal: berbeda, berada di zona pojok lembar, luas cukup besar, sisi berhadapan mirip."""
     if len({tuple(p) for p in sudut}) < 4:
         return False
     if cv2.contourArea(sudut) < AREA_MIN_FRAKSI * lebar * tinggi:
         return False
+
+    tl, tr, br, bl = sudut
+    # 4 marker harus berada di area pojok luar kertas (bukan di tengah konten lembar)
+    max_margin_x = 0.22 * lebar
+    max_margin_y = 0.22 * tinggi
+    if tl[0] > max_margin_x or tl[1] > max_margin_y:
+        return False
+    if tr[0] < lebar - max_margin_x or tr[1] > max_margin_y:
+        return False
+    if br[0] < lebar - max_margin_x or br[1] < tinggi - max_margin_y:
+        return False
+    if bl[0] > max_margin_x or bl[1] < tinggi - max_margin_y:
+        return False
+
     atas = np.linalg.norm(sudut[1] - sudut[0])
     bawah = np.linalg.norm(sudut[2] - sudut[3])
     kiri = np.linalg.norm(sudut[3] - sudut[0])

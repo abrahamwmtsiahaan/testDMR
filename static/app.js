@@ -12,6 +12,102 @@ function toast(pesan, err = false) {
   toast._t = setTimeout(() => (t.className = ""), 3500);
 }
 
+function escapeHtml(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      })[c],
+  );
+}
+
+/* ===================== MODAL DIALOG ===================== */
+function tampilModal({
+  judul = "Konfirmasi",
+  pesan = "",
+  tipe = "warning", // 'warning', 'danger', 'info', 'sukses'
+  tombolKonfirmasi = "Lanjutkan",
+  tombolBatal = "Batal",
+  tombolSekunder = null,
+  warnaKonfirmasi = "utama", // 'utama' | 'danger'
+}) {
+  return new Promise((resolve) => {
+    const backdrop = $("#modal-dialog");
+    const ikonEl = $("#modal-ikon");
+    const judulEl = $("#modal-judul");
+    const pesanEl = $("#modal-pesan");
+    const aksiEl = $("#modal-aksi");
+
+    judulEl.textContent = judul;
+    pesanEl.innerHTML = pesan;
+
+    ikonEl.className = "modal-ikon " + tipe;
+    if (tipe === "danger") ikonEl.textContent = "✕";
+    else if (tipe === "sukses") ikonEl.textContent = "✓";
+    else if (tipe === "info") ikonEl.textContent = "ℹ";
+    else ikonEl.textContent = "⚠️";
+
+    aksiEl.innerHTML = "";
+
+    if (tombolSekunder) {
+      const btnSek = document.createElement("button");
+      btnSek.className = "btn-sekunder";
+      btnSek.type = "button";
+      btnSek.textContent = tombolSekunder;
+      btnSek.onclick = () => {
+        tutup();
+        resolve("sekunder");
+      };
+      aksiEl.appendChild(btnSek);
+    }
+
+    if (tombolBatal) {
+      const btnBatal = document.createElement("button");
+      btnBatal.className = "btn-batal";
+      btnBatal.type = "button";
+      btnBatal.textContent = tombolBatal;
+      btnBatal.onclick = () => {
+        tutup();
+        resolve(false);
+      };
+      aksiEl.appendChild(btnBatal);
+    }
+
+    if (tombolKonfirmasi) {
+      const btnKonf = document.createElement("button");
+      btnKonf.className = warnaKonfirmasi === "danger" ? "btn-danger" : "utama";
+      btnKonf.type = "button";
+      btnKonf.textContent = tombolKonfirmasi;
+      btnKonf.onclick = () => {
+        tutup();
+        resolve(true);
+      };
+      aksiEl.appendChild(btnKonf);
+    }
+
+    function tutup() {
+      backdrop.hidden = true;
+      document.removeEventListener("keydown", onKeyDown);
+    }
+
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        tutup();
+        resolve(false);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+
+    backdrop.hidden = false;
+  });
+}
+
 async function api(url, opsi = {}) {
   const r = await fetch(url, opsi);
   if (!r.ok) {
@@ -201,6 +297,7 @@ class KanvasGambar {
 const S = {
   status: { scanner: null },
   template: { nama: "", kriteria: [], contohUrl: null, contohImg: null },
+  templateSnapshot: null,
   kalibrasi: { idx: -1, klik: [], aktif: false },
   sesi: null, // { sesi, lembar: [...] }
   templateSesi: null, // template yang dipakai sesi (untuk label & grid)
@@ -208,8 +305,101 @@ const S = {
   lembarDipilih: new Set(),
 };
 
+/* ===================== PELACAKAN PERUBAHAN TEMPLATE ===================== */
+function getTemplateSnapshot() {
+  const kriteria = (S.template.kriteria || []).map((k) => ({
+    nama: (k.nama || "").trim(),
+    arah_baca: k.arah_baca,
+    jumlah_kolom: Number(k.jumlah_kolom) || 1,
+    jumlah_baris: Number(k.jumlah_baris) || 1,
+    jenis_label: k.jenis_label,
+    label_kustom: (k.label_kustom || "").trim(),
+    label_baris: Array.isArray(k.label_baris) ? [...k.label_baris] : [],
+    grid: k.grid
+      ? {
+          x0: Math.round((k.grid.x0 || 0) * 100) / 100,
+          y0: Math.round((k.grid.y0 || 0) * 100) / 100,
+          dx: Math.round((k.grid.dx || 0) * 100) / 100,
+          dy: Math.round((k.grid.dy || 0) * 100) / 100,
+        }
+      : null,
+  }));
+
+  return JSON.stringify({
+    nama: ($("#nama-template")?.value || "").trim(),
+    contohUrl: S.template.contohUrl || null,
+    kriteria,
+  });
+}
+
+function catatSnapshotTemplate() {
+  S.templateSnapshot = getTemplateSnapshot();
+  perbaruiIndikatorSimpan();
+}
+
+function isTemplateDirty() {
+  if (S.templateSnapshot === undefined || S.templateSnapshot === null) return false;
+  return S.templateSnapshot !== getTemplateSnapshot();
+}
+
+function perbaruiIndikatorSimpan() {
+  const el = $("#info-template");
+  if (!el) return;
+  if (isTemplateDirty()) {
+    if (!el.classList.contains("err")) {
+      el.className = "info";
+      el.innerHTML = `<span style="color:#d97706; font-weight:600;">● Perubahan belum disimpan. Klik "Simpan template".</span>`;
+    }
+  } else {
+    if (el.innerHTML.includes("Perubahan belum disimpan")) {
+      el.innerHTML = "";
+    }
+  }
+}
+
 /* ===================== NAVIGASI TAB ===================== */
-function bukaTab(nama) {
+async function bukaTab(nama, abaikanDirty = false) {
+  const tabSekarang = $(".tab.aktif")?.id?.replace("tab-", "") || "template";
+
+  if (tabSekarang === "template" && nama !== "template" && !abaikanDirty && isTemplateDirty()) {
+    const namaTujuan =
+      {
+        scan: "Step 2 (Scan)",
+        periksa: "Step 3 (Periksa)",
+        simpan: "Step 4 (Simpan)",
+      }[nama] || "step berikutnya";
+
+    const aksi = await tampilModal({
+      judul: "Simpan Template Terlebih Dahulu",
+      pesan: `Terdapat perubahan pada template di <b>Step 1</b> (posisi bulatan, arah baca, kotak/bulatan, isi bulatan, atau bagian) yang belum disimpan.<br><br>Harap simpan perubahan pada <b>Step 1 ("Simpan template")</b> terlebih dahulu sebelum melanjutkan ke <b>${namaTujuan}</b>.
+      <div class="highlight-box">
+        Klik <b>"Simpan Template &amp; Lanjut"</b> untuk menyimpan perubahan secara otomatis dan melanjutkan ke ${namaTujuan}.
+      </div>`,
+      tipe: "warning",
+      tombolKonfirmasi: "Simpan Template & Lanjut",
+      tombolBatal: "Batal (Tetap di Step 1)",
+      tombolSekunder: "Lanjut Tanpa Menyimpan",
+    });
+
+    if (aksi === true) {
+      const sukses = await simpanTemplate();
+      if (!sukses) return;
+      await bukaTab(nama, true);
+      return;
+    } else if (aksi === "sekunder") {
+      await bukaTab(nama, true);
+      return;
+    } else {
+      const btnSimpan = $("#btn-simpan-template");
+      if (btnSimpan) {
+        btnSimpan.scrollIntoView({ behavior: "smooth", block: "center" });
+        btnSimpan.classList.add("sorot-simpan");
+        setTimeout(() => btnSimpan.classList.remove("sorot-simpan"), 2000);
+      }
+      return;
+    }
+  }
+
   $$("#nav button").forEach((b) =>
     b.classList.toggle("aktif", b.dataset.tab === nama),
   );
@@ -341,13 +531,46 @@ function renderBagian() {
         <button class="kecil utama" data-tandai>Tandai posisi</button>
         <span class="tag ${k.grid ? "ok" : "belum"}">${k.grid ? "Sudah ditandai" : "Belum ditandai"}</span>
       </div>`;
-    const tanganiInput = (e) => {
+    const tanganiInput = async (e) => {
       const f = e.target.dataset.f;
       if (!f) return;
       let v = e.target.value;
-      if (f === "jumlah_kolom" || f === "jumlah_baris")
+      if (f === "jumlah_kolom" || f === "jumlah_baris") {
+        if (e.type === "input") return;
         v = Math.max(1, parseInt(v) || 1);
+      }
       if (f === "nama") v = v.trim().toLowerCase().replace(/\s+/g, "_");
+
+      if (["arah_baca", "jenis_label"].includes(f) && e.type === "input") return;
+
+      if (k[f] === v) return;
+
+      if (
+        k.grid &&
+        ["arah_baca", "jumlah_kolom", "jumlah_baris", "jenis_label"].includes(f)
+      ) {
+        const labelField =
+          {
+            arah_baca: "arah baca",
+            jumlah_kolom: "kotak ke samping",
+            jumlah_baris: "bulatan ke bawah",
+            jenis_label: "isi bulatan pilihan",
+          }[f] || f;
+
+        const yakin = await tampilModal({
+          judul: `Ubah ${labelField.charAt(0).toUpperCase() + labelField.slice(1)}?`,
+          pesan: `Bagian <b>"${escapeHtml(k.nama)}"</b> sudah ditandai posisinya. Mengubah <b>${labelField}</b> akan mereset posisi yang telah ditandai.<br><br>Apakah Anda yakin ingin mengubah bagian ini?`,
+          tipe: "warning",
+          tombolKonfirmasi: "Ya, Ubah",
+          tombolBatal: "Batal",
+        });
+
+        if (!yakin) {
+          e.target.value = k[f];
+          return;
+        }
+      }
+
       k[f] = v;
       if (
         [
@@ -365,23 +588,50 @@ function renderBagian() {
       }
       if (f === "jenis_label" || f === "arah_baca") {
         renderBagian();
+        perbaruiIndikatorSimpan();
         return;
       }
       if (f !== "nama" && f !== "label_kustom") {
-        $(".tag", d).className = "tag belum";
-        $(".tag", d).textContent = "Belum ditandai";
+        const tag = $(".tag", d);
+        if (tag) {
+          tag.className = "tag belum";
+          tag.textContent = "Belum ditandai";
+        }
       }
       kalib.gambar();
+      perbaruiIndikatorSimpan();
     };
     d.addEventListener("input", tanganiInput);
     d.addEventListener("change", tanganiInput);
-    $("[data-hapus]", d).onclick = () => {
+    $("[data-hapus]", d).onclick = async () => {
+      const yakin = await tampilModal({
+        judul: "Kurangi / Hapus Bagian?",
+        pesan: `Apakah Anda yakin ingin menghapus / mengurangi bagian <b>"${escapeHtml(k.nama)}"</b> dari template?`,
+        tipe: "danger",
+        tombolKonfirmasi: "Ya, Hapus Bagian",
+        tombolBatal: "Batal",
+        warnaKonfirmasi: "danger",
+      });
+      if (!yakin) return;
       S.template.kriteria.splice(i, 1);
       if (S.kalibrasi.idx === i) mulaiKalibrasi(-1);
       renderBagian();
       kalib.gambar();
+      perbaruiIndikatorSimpan();
     };
-    $("[data-tandai]", d).onclick = () => mulaiKalibrasi(i);
+    $("[data-tandai]", d).onclick = async () => {
+      if (k.grid) {
+        const yakin = await tampilModal({
+          judul: "Ubah Posisi Bagian?",
+          pesan: `Posisi bulatan untuk bagian <b>"${escapeHtml(k.nama)}"</b> sudah ditandai sebelumnya.<br><br>Apakah Anda yakin ingin mengubah posisi bagian ini?`,
+          tipe: "warning",
+          tombolKonfirmasi: "Ya, Ubah Posisi",
+          tombolBatal: "Batal",
+        });
+        if (!yakin) return;
+      }
+      mulaiKalibrasi(i);
+    };
     w.appendChild(d);
   });
 }
@@ -468,6 +718,7 @@ function simpanKalibrasi() {
   renderBagian();
   tampilBantuan();
   kalib.gambar();
+  perbaruiIndikatorSimpan();
   if (berikut >= 0) mulaiKalibrasi(berikut);
 }
 
@@ -621,7 +872,20 @@ $("#file-contoh").onchange = async (e) => {
   e.target.value = "";
 };
 
-$("#btn-tambah-bagian").onclick = () => tambahBagian();
+$("#btn-tambah-bagian").onclick = async () => {
+  if (S.template.kriteria.length > 0) {
+    const yakin = await tampilModal({
+      judul: "Tambah Bagian Template?",
+      pesan: "Apakah Anda yakin ingin menambah bagian baru ke dalam template?",
+      tipe: "info",
+      tombolKonfirmasi: "Ya, Tambah Bagian",
+      tombolBatal: "Batal",
+    });
+    if (!yakin) return;
+  }
+  tambahBagian();
+  perbaruiIndikatorSimpan();
+};
 
 /* ---- simpan / muat template ---- */
 async function muatDaftarTemplate() {
@@ -640,60 +904,79 @@ async function muatDaftarTemplate() {
   }
 }
 
-$("#btn-simpan-template").onclick = async () => {
+async function simpanTemplate() {
   const nama = $("#nama-template").value.trim();
   const el = $("#info-template");
   if (!nama) {
     el.className = "info err";
     el.textContent = "Isi nama template dulu.";
-    return;
+    toast("Isi nama template dulu.", true);
+    return false;
   }
   if (!S.template.kriteria.length) {
     el.className = "info err";
     el.textContent = "Tambahkan minimal satu bagian.";
-    return;
+    toast("Tambahkan minimal satu bagian.", true);
+    return false;
   }
   const belum = S.template.kriteria.filter((k) => !k.grid).map((k) => k.nama);
   if (belum.length) {
     el.className = "info err";
     el.textContent = "Belum ditandai: " + belum.join(", ");
-    return;
+    toast("Ada bagian yang belum ditandai.", true);
+    return false;
   }
   const namaKriteria = S.template.kriteria.map((k) => k.nama);
   if (new Set(namaKriteria).size !== namaKriteria.length) {
     el.className = "info err";
     el.textContent = "Nama bagian tidak boleh sama.";
-    return;
+    toast("Nama bagian tidak boleh sama.", true);
+    return false;
   }
   for (const k of S.template.kriteria) {
     const butuh =
       k.arah_baca === "horizontal" ? k.jumlah_kolom : k.jumlah_baris;
-    if (k.label_baris.length !== butuh) {
+    if (!k.label_baris || k.label_baris.length !== butuh) {
       if (k.jenis_label !== "kustom") {
         k.label_baris = buatLabel(k.jenis_label, butuh, k.label_kustom);
       } else {
         el.className = "info err";
-        el.textContent = `Isi bulatan "${k.nama}" (${k.label_baris.length}) tidak sesuai dengan jumlah ${k.arah_baca === "horizontal" ? "kolom" : "baris"} (${butuh}).`;
-        return;
+        el.textContent = `Isi bulatan "${k.nama}" (${(k.label_baris || []).length}) tidak sesuai dengan jumlah ${k.arah_baca === "horizontal" ? "kolom" : "baris"} (${butuh}).`;
+        toast(el.textContent, true);
+        return false;
       }
     }
   }
   const aman = nama.replace(/[\\/:*?"<>|]/g, "_");
-  await kirimJson("/api/template/" + encodeURIComponent(aman), {
-    nama: aman,
-    kriteria: S.template.kriteria,
-    contoh: S.template.contohUrl,
-  });
-  el.className = "info ok";
-  el.textContent = `✓ Template "${aman}" tersimpan.`;
-  await muatDaftarTemplate();
-  $("#pilih-template").value = aman;
-  $("#scan-template").value = aman;
-  toast("Template tersimpan");
-};
+  try {
+    await kirimJson("/api/template/" + encodeURIComponent(aman), {
+      nama: aman,
+      kriteria: S.template.kriteria,
+      contoh: S.template.contohUrl,
+    });
+    el.className = "info ok";
+    el.textContent = `✓ Template "${aman}" tersimpan.`;
+    await muatDaftarTemplate();
+    $("#pilih-template").value = aman;
+    $("#scan-template").value = aman;
+    catatSnapshotTemplate();
+    toast("Template tersimpan");
+    return true;
+  } catch (err) {
+    el.className = "info err";
+    el.textContent = "Gagal menyimpan template: " + err.message;
+    toast(el.textContent, true);
+    return false;
+  }
+}
 
-$("#btn-muat-template").onclick = async () => {
-  const n = $("#pilih-template").value;
+$("#btn-simpan-template").onclick = simpanTemplate;
+
+$("#nama-template").addEventListener("input", () => {
+  perbaruiIndikatorSimpan();
+});
+
+async function muatTemplate(n) {
   if (!n) return;
   const t = await apiJson("/api/template/" + encodeURIComponent(n));
   S.template.kriteria = t.kriteria;
@@ -729,7 +1012,24 @@ $("#btn-muat-template").onclick = async () => {
     info.textContent =
       "Ambil lembar contoh bila ingin melihat/ubah posisi bulatan.";
   }
+  catatSnapshotTemplate();
   toast(`Template "${n}" dimuat`);
+}
+
+$("#btn-muat-template").onclick = async () => {
+  const n = $("#pilih-template").value;
+  if (!n) return;
+  if (isTemplateDirty()) {
+    const yakin = await tampilModal({
+      judul: "Muat Template Lain?",
+      pesan: `Terdapat perubahan pada template saat ini yang belum disimpan.<br><br>Jika memuat template lain, perubahan tersebut akan hilang. Apakah Anda yakin ingin memuat template <b>"${escapeHtml(n)}"</b>?`,
+      tipe: "warning",
+      tombolKonfirmasi: "Ya, Muat",
+      tombolBatal: "Batal",
+    });
+    if (!yakin) return;
+  }
+  await muatTemplate(n);
 };
 
 /* ===================== TAB 2: SCAN / UNGGAH ===================== */
@@ -930,12 +1230,6 @@ function renderTabel() {
   });
   t.innerHTML = h + "</tbody>";
   updateStatusPilihan();
-}
-function escapeHtml(s) {
-  return s.replace(
-    /[&<>"]/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
-  );
 }
 
 $("#hanya-masalah").onchange = renderTabel;
@@ -1753,8 +2047,9 @@ $("#btn-simpan-kirim").onclick = async () => {
 (async function init() {
   await muatStatus();
   await muatDaftarTemplate();
-  if ($("#pilih-template").value) await $("#btn-muat-template").onclick();
-  else
+  if ($("#pilih-template").value) {
+    await muatTemplate($("#pilih-template").value);
+  } else {
     tambahBagian({
       nama: "nama_peserta",
       jumlah_kolom: 22,
@@ -1762,5 +2057,15 @@ $("#btn-simpan-kirim").onclick = async () => {
       jenis_label: "huruf",
       label_baris: buatLabel("huruf", 26),
     });
+    catatSnapshotTemplate();
+  }
   tampilBantuan();
 })();
+
+window.addEventListener("beforeunload", (e) => {
+  if (isTemplateDirty()) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
+
