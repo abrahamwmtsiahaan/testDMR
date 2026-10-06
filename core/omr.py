@@ -142,36 +142,79 @@ def _pilih_empat_sudut(pts: np.ndarray) -> np.ndarray | None:
     return np.array([tl, tr, br, bl], dtype="float32")
 
 
+def pangkas_putih_bawah(
+    img: np.ndarray, ambang_putih: float = 253.0, margin_bawah: int = 50
+) -> np.ndarray:
+    """
+    Pangkas area putih kosong di bagian bawah lembar yang diakibatkan
+    panjang pemindaian scanner (over-scan) melebihi panjang fisik kertas.
+    """
+    if img is None or img.size == 0 or img.shape[0] < 500:
+        return img
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
+    row_means = gray.mean(axis=1)
+    non_white = np.where(row_means < ambang_putih)[0]
+    if len(non_white) > 0 and non_white[-1] < img.shape[0] - 100:
+        batas_bawah = min(img.shape[0], non_white[-1] + margin_bawah)
+        return img[:batas_bawah, :]
+    return img
+
+
 def _valid_segiempat(sudut: np.ndarray, lebar: int, tinggi: int) -> bool:
-    """Cek 4 titik masuk akal: berbeda, berada di zona pojok lembar, luas cukup besar, sisi berhadapan mirip."""
+    """
+    Cek 4 titik masuk akal sebagai sudut lembar LJK:
+    berbeda, membentuk segiempat konveks, rasio aspek proporsional kertas standar,
+    dan sisi-sisi yang berhadapan memiliki panjang yang mirip.
+    """
     if len({tuple(p) for p in sudut}) < 4:
         return False
-    if cv2.contourArea(sudut) < AREA_MIN_FRAKSI * lebar * tinggi:
+    if not cv2.isContourConvex(np.int32(sudut)):
         return False
 
     tl, tr, br, bl = sudut
-    # 4 marker harus berada di area pojok luar kertas (bukan di tengah konten lembar)
-    max_margin_x = 0.22 * lebar
-    max_margin_y = 0.22 * tinggi
-    if tl[0] > max_margin_x or tl[1] > max_margin_y:
+
+    # Margin horizontal: marker harus berada dekat tepi kiri dan kanan lembar
+    max_margin_x = 0.25 * lebar
+    if tl[0] > max_margin_x or bl[0] > max_margin_x:
         return False
-    if tr[0] < lebar - max_margin_x or tr[1] > max_margin_y:
+    if tr[0] < lebar - max_margin_x or br[0] < lebar - max_margin_x:
         return False
-    if br[0] < lebar - max_margin_x or br[1] < tinggi - max_margin_y:
-        return False
-    if bl[0] > max_margin_x or bl[1] < tinggi - max_margin_y:
+
+    # Margin atas: marker atas harus berada di bagian atas scan
+    max_margin_top = 0.25 * lebar
+    if tl[1] > max_margin_top or tr[1] > max_margin_top:
         return False
 
     atas = np.linalg.norm(sudut[1] - sudut[0])
     bawah = np.linalg.norm(sudut[2] - sudut[3])
     kiri = np.linalg.norm(sudut[3] - sudut[0])
     kanan = np.linalg.norm(sudut[2] - sudut[1])
+
     if min(atas, bawah, kiri, kanan) < 1:
         return False
     if max(atas, bawah) / min(atas, bawah) > 1.25:
         return False
     if max(kiri, kanan) / min(kiri, kanan) > 1.25:
         return False
+
+    # Lebar harus mencakup sebagian besar halaman
+    if min(atas, bawah) < 0.60 * lebar:
+        return False
+
+    # Rasio aspek segiempat (tinggi / lebar) sesuai standar kertas (Letter, A4, F4, Legal)
+    rasio = ((kiri + kanan) / 2.0) / max((atas + bawah) / 2.0, 1.0)
+    if not (1.0 <= rasio <= 1.9):
+        return False
+
+    # Marker bawah harus berada di bawah marker atas secara signifikan
+    if min(bl[1], br[1]) <= max(tl[1], tr[1]) + 0.8 * min(atas, bawah):
+        return False
+
+    # Luas segiempat harus konsisten dengan dimensi sisi
+    luas = cv2.contourArea(sudut)
+    if luas < 0.60 * min(atas, bawah) * min(kiri, kanan):
+        return False
+
     return True
 
 
@@ -234,6 +277,7 @@ def luruskan_lembar(img: np.ndarray, debug_path: str | Path | None = None):
     metode: 'marker' | 'border' | 'tidak_terkoreksi'
     Bila semua gagal, gambar ASLI dikembalikan (tidak diubah ukurannya).
     """
+    img = pangkas_putih_bawah(img)
     metode = "marker"
     sumber = deteksi_marker(img, debug_path)
     if sumber is None:

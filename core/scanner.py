@@ -48,7 +48,18 @@ class ScannerSANE(ScannerBase):
         r = subprocess.run(cmd, stderr=subprocess.PIPE, text=True)
         if r.returncode not in (0, 7):      # 7 = ADF habis (normal)
             raise ScannerError(f"Scan gagal (kode {r.returncode}): {r.stderr.strip()[-300:]}")
-        return sorted(Path(p) for p in glob.glob(str(folder / f"{prefix}_*.png")))
+        files = sorted(Path(p) for p in glob.glob(str(folder / f"{prefix}_*.png")))
+        try:
+            from . import omr
+            for f in files:
+                img = omr.baca_gambar(f)
+                if img is not None:
+                    pangkas = omr.pangkas_putih_bawah(img)
+                    if pangkas.shape != img.shape:
+                        omr.tulis_gambar(f, pangkas)
+        except Exception:
+            pass
+        return files
 
 
 import xml.etree.ElementTree as ET
