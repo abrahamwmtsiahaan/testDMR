@@ -7,8 +7,77 @@ import sys
 from pathlib import Path
 
 
+from typing import Callable, Optional
+import time
+
+
 class ScannerError(Exception):
     pass
+
+
+def _pantau_proses_scan(
+    proc: subprocess.Popen,
+    folder: Path,
+    pola_glob: str,
+    jumlah: int = 0,
+    callback_progress: Optional[Callable[[int, int, str], None]] = None,
+    timeout_inaktif: float = 60.0,
+    timeout_maks: float = 900.0,
+) -> tuple[int, str, str]:
+    """
+    Memantau berkas gambar baru yang dihasilkan scanner secara real-time.
+    Memanggil callback_progress setiap kali ada lembar baru yang selesai dipindai.
+    """
+    waktu_mulai = time.time()
+    waktu_terakhir = time.time()
+    terdeteksi = set()
+
+    if callback_progress:
+        if jumlah and jumlah > 0:
+            callback_progress(0, jumlah, f"Scanner: Memulai pemindaian {jumlah} lembar...")
+        else:
+            callback_progress(0, 0, "Scanner: Memulai pemindaian otomatis dari ADF...")
+
+    while proc.poll() is None:
+        sekarang = time.time()
+        for p in glob.glob(pola_glob):
+            if p not in terdeteksi:
+                try:
+                    if os.path.getsize(p) > 0:
+                        terdeteksi.add(p)
+                        waktu_terakhir = sekarang
+                        n = len(terdeteksi)
+                        if callback_progress:
+                            if jumlah and jumlah > 0:
+                                callback_progress(
+                                    n, jumlah, f"Scanner: Memindai lembar {n}/{jumlah}..."
+                                )
+                            else:
+                                callback_progress(
+                                    n, 0, f"Scanner: Lembar ke-{n} berhasil dipindai..."
+                                )
+                except OSError:
+                    pass
+
+        if sekarang - waktu_terakhir > timeout_inaktif:
+            proc.kill()
+            raise ScannerError("Waktu pemindaian habis (scanner tidak merespons selama 60 detik).")
+        if sekarang - waktu_mulai > timeout_maks:
+            proc.kill()
+            raise ScannerError("Batas waktu pemindaian maksimal (15 menit) terlampaui.")
+
+        time.sleep(0.3)
+
+    stdout, stderr = proc.communicate()
+    for p in glob.glob(pola_glob):
+        if p not in terdeteksi:
+            try:
+                if os.path.getsize(p) > 0:
+                    terdeteksi.add(p)
+            except OSError:
+                pass
+
+    return proc.returncode, stdout or "", stderr or ""
 
 
 class ScannerBase:
@@ -17,8 +86,15 @@ class ScannerBase:
     def tersedia(self) -> bool:
         raise NotImplementedError
 
-    def scan_batch(self, folder: Path, prefix: str, jumlah: int, dpi: int = 300) -> list[Path]:
-        """Scan `jumlah` lembar dari ADF. Return daftar file hasil, terurut."""
+    def scan_batch(
+        self,
+        folder: Path,
+        prefix: str,
+        jumlah: int = 0,
+        dpi: int = 300,
+        callback_progress: Optional[Callable[[int, int, str], None]] = None,
+    ) -> list[Path]:
+        """Scan `jumlah` lembar dari ADF. Jika jumlah <= 0, scan sampai ADF kosong. Return daftar file hasil."""
         raise NotImplementedError
 
 
@@ -36,19 +112,42 @@ class ScannerSANE(ScannerBase):
             raise ScannerError("Scanner tidak ditemukan. Cek kabel USB dan pastikan mesin menyala.")
         return m.group(1)
 
-    def scan_batch(self, folder, prefix, jumlah, dpi=300):
+    def scan_batch(
+        self,
+        folder,
+        prefix,
+        jumlah=0,
+        dpi=300,
+        callback_progress=None,
+    ):
         device = self._cari_device()
         pola = str(folder / f"{prefix}_%03d.png")
         cmd = [
             "scanimage", f"--device-name={device}",
             "--source=Automatic Document Feeder(left aligned)",
             f"--resolution={dpi}", "--format=png",
-            f"--batch={pola}", "--batch-start=1", f"--batch-count={jumlah}",
+            f"--batch={pola}", "--batch-start=1",
         ]
-        r = subprocess.run(cmd, stderr=subprocess.PIPE, text=True)
-        if r.returncode not in (0, 7):      # 7 = ADF habis (normal)
-            raise ScannerError(f"Scan gagal (kode {r.returncode}): {r.stderr.strip()[-300:]}")
+        if jumlah and jumlah > 0:
+            cmd.append(f"--batch-count={jumlah}")
+
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        ret, stdout, stderr = _pantau_proses_scan(
+            proc,
+            folder,
+            str(folder / f"{prefix}_*.png"),
+            jumlah=jumlah,
+            callback_progress=callback_progress,
+        )
+        if ret not in (0, 7):      # 7 = ADF habis (normal)
+            raise ScannerError(f"Scan gagal (kode {ret}): {stderr.strip()[-300:]}")
+
         files = sorted(Path(p) for p in glob.glob(str(folder / f"{prefix}_*.png")))
+        if jumlah and jumlah > 0:
+            files = files[:jumlah]
+
         try:
             from . import omr
             for f in files:
@@ -173,7 +272,7 @@ class ScannerNAPS2(ScannerBase):
 
         return hasil
 
-    def scan_batch(self, folder, prefix, jumlah, dpi=300):
+    def scan_batch(self, folder, prefix, jumlah=0, dpi=300, callback_progress=None):
         exe = self._exe()
         if not exe:
             raise ScannerError("NAPS2 belum terpasang. Unduh gratis di naps2.com atau pakai mode Upload.")
@@ -221,26 +320,42 @@ class ScannerNAPS2(ScannerBase):
 
         for cmd in perintah_kandidat:
             try:
-                r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-                if r.returncode == 0:
+                # Bersihkan berkas PNG parsial jika ada dari percobaan sebelumnya
+                for f in glob.glob(str(folder / f"{prefix}_*.png")):
+                    try:
+                        os.remove(f)
+                    except OSError:
+                        pass
+
+                proc = subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+                ret, stdout, stderr = _pantau_proses_scan(
+                    proc,
+                    folder,
+                    str(folder / f"{prefix}_*.png"),
+                    jumlah=jumlah,
+                    callback_progress=callback_progress,
+                )
+                if ret == 0:
                     hasil = sorted(Path(p) for p in glob.glob(str(folder / f"{prefix}_*.png")))
                     if hasil:
-                        return hasil[:jumlah] if jumlah else hasil
+                        return hasil[:jumlah] if (jumlah and jumlah > 0) else hasil
                 else:
-                    err = (r.stderr or r.stdout or "").strip()
+                    err = (stderr or stdout or "").strip()
                     if err:
                         pesan_error_terakhir = err
                     if "no device was specified" not in err.lower():
                         ada_perangkat_terdeteksi = True
-            except subprocess.TimeoutExpired:
-                pesan_error_terakhir = "Waktu pemindaian scanner habis (timeout 120 detik)."
+            except ScannerError:
+                raise
             except Exception as e:
                 pesan_error_terakhir = str(e)
 
         # Cek apakah ada file yang sempat tersimpan
         hasil = sorted(Path(p) for p in glob.glob(str(folder / f"{prefix}_*.png")))
         if hasil:
-            return hasil[:jumlah] if jumlah else hasil
+            return hasil[:jumlah] if (jumlah and jumlah > 0) else hasil
 
         # Format pesan error yang solutif bagi pengguna
         if not ada_perangkat_terdeteksi or "no device was specified" in pesan_error_terakhir.lower():

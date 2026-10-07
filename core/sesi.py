@@ -15,7 +15,7 @@ import os
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import cv2
 import numpy as np
@@ -123,7 +123,9 @@ def sesi_terakhir() -> Optional[dict[str, Any]]:
 
 # ======================= PROSES LEMBAR =======================
 def proses_lembar(
-    nama_template: str, gambar: list[tuple[str, np.ndarray]]
+    nama_template: str,
+    gambar: list[tuple[str, np.ndarray]],
+    callback_progress: Optional[Callable[[dict[str, Any]], None]] = None,
 ) -> dict[str, Any]:
     """
     gambar: daftar (nama_file, img_bgr) mentah, satu per lembar, urut sesuai input.
@@ -140,8 +142,17 @@ def proses_lembar(
     folder_lurus = MEDIA_DIR / sesi_id / "lurus"
     folder_lurus.mkdir(parents=True, exist_ok=True)
 
+    total = len(gambar)
     lembar = []
     for i, (nama_file, img) in enumerate(gambar, start=1):
+        if callback_progress:
+            callback_progress({
+                "tipe": "progress",
+                "fase": "proses",
+                "saat_ini": i,
+                "total": total,
+                "pesan": f"Python memproses lembar {i}/{total} ({nama_file})...",
+            })
         path_lurus = folder_lurus / f"{i:03d}.png"
         hasil = omr.baca_lembar(img, kriteria, path_lurus=path_lurus)
         lembar.append(
@@ -155,6 +166,15 @@ def proses_lembar(
                 "lurus": f"/media/sesi/{sesi_id}/lurus/{i:03d}.png",
             }
         )
+
+    if callback_progress:
+        callback_progress({
+            "tipe": "progress",
+            "fase": "selesai",
+            "saat_ini": total,
+            "total": total,
+            "pesan": f"Selesai memproses {total} lembar. Memuat hasil...",
+        })
 
     data = {"sesi": sesi_id, "template": nama_template, "lembar": lembar}
     _simpan_state(data)

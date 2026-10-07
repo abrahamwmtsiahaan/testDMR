@@ -86,11 +86,26 @@
       </div>
 
       <div id="blok-scanner">
-        <div class="baris">
-          <label>Jumlah lembar yang akan di-scan</label>
-          <input id="scan-jumlah" type="number" min="1" value="1">
+        <div class="opsi-mode-scan">
+          <div class="mode-judul">Mode Pemindaian ADF:</div>
+          <div class="mode-pilihan-grup">
+            <label class="cek" style="cursor:pointer; font-weight:600;">
+              <input type="radio" name="mode-scan" id="mode-scan-dinamis" value="dinamis" checked>
+              <span>Scan Dinamis (Semua lembar di feeder ADF sampai habis)</span>
+            </label>
+            <label class="cek" style="cursor:pointer; font-weight:600;">
+              <input type="radio" name="mode-scan" id="mode-scan-manual" value="manual">
+              <span>Tentukan Jumlah Lembar</span>
+            </label>
+          </div>
+          <div id="wadah-jumlah-lembar" class="wadah-jumlah" style="display:none;">
+            <label for="scan-jumlah" style="font-size:13px; color:var(--redup); width:auto;">Jumlah lembar:</label>
+            <input id="scan-jumlah" type="number" min="1" value="10" placeholder="mis. 30" style="width:110px;">
+            <span style="font-size:13px; color:var(--redup);">lembar</span>
+          </div>
         </div>
-        <p class="petunjuk">Letakkan lembar di ADF (menghadap sesuai petunjuk scanner), lalu tekan tombol.</p>
+
+        <p class="petunjuk" id="petunjuk-scan">Letakkan lembar di ADF scanner. Semua lembar di penampung akan dipindai otomatis sampai habis tanpa batas jumlah.</p>
         <button id="btn-mulai-scan" class="utama besar">MULAI SCAN</button>
       </div>
 
@@ -101,9 +116,24 @@
         <div class="dz-sub">atau <label class="link">pilih file<input id="file-scan" type="file" accept="image/*,.pdf" multiple hidden></label></div>
       </div>
 
-      <div id="proses" class="proses" hidden>
-        <div class="spinner"></div>
-        <div id="proses-teks">Memproses...</div>
+      <div id="proses" class="proses-box" hidden>
+        <div class="proses-header">
+          <div class="spinner"></div>
+          <div class="proses-status-wrap">
+            <div id="proses-teks" class="proses-judul">Memproses...</div>
+            <div id="proses-sub" class="proses-sub">Menyiapkan...</div>
+          </div>
+        </div>
+        <div class="proses-bar-track">
+          <div class="proses-bar-fill" id="proses-bar-fill" style="width: 0%;"></div>
+        </div>
+        <div class="proses-log-area">
+          <div class="proses-log-header">
+            <span>Log Aktivitas:</span>
+            <span id="proses-log-counter" class="tag ok" style="font-size: 11px;">0 lembar</span>
+          </div>
+          <div class="proses-log-list" id="proses-log-list"></div>
+        </div>
       </div>
       <div id="info-scan" class="info"></div>
     </div>

@@ -28,6 +28,7 @@ lalu buka http://localhost:8000
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import datetime
 import io
@@ -165,6 +166,8 @@ class TemplateIn(BaseModel):
 class SesiScanIn(BaseModel):
     template: str
     jumlah: int = 1
+    dinamis: bool = False
+    stream: bool = True
 
 
 class KoreksiIn(BaseModel):
@@ -248,32 +251,215 @@ def simpan_template(nama: str, body: TemplateIn):
 
 # ======================= SESI: SCAN / UNGGAH =======================
 @app.post("/api/sesi/scan")
-def sesi_scan(body: SesiScanIn):
-    aktif = scanner.scanner_aktif()
-    if not aktif:
-        raise scanner.ScannerError("Scanner tidak terdeteksi.")
-    with tempfile.TemporaryDirectory() as tmp:
-        path_hasil = aktif.scan_batch(Path(tmp), "lembar", body.jumlah)
-        if not path_hasil:
-            raise scanner.ScannerError("Tidak ada lembar terbaca dari scanner.")
-        gambar = []
-        for p in path_hasil:
-            img = omr.baca_gambar(p)
-            if img is not None:
-                gambar.append((p.name, img))
-        return sesi_mod.proses_lembar(body.template, gambar)
+async def sesi_scan(body: SesiScanIn):
+    target_jml = 0 if body.dinamis else max(0, body.jumlah)
+
+    if not body.stream:
+        aktif = scanner.scanner_aktif()
+        if not aktif:
+            raise scanner.ScannerError("Scanner tidak terdeteksi.")
+        with tempfile.TemporaryDirectory() as tmp:
+            path_hasil = aktif.scan_batch(Path(tmp), "lembar", target_jml)
+            if not path_hasil:
+                raise scanner.ScannerError("Tidak ada lembar terbaca dari scanner.")
+            gambar = []
+            for p in path_hasil:
+                img = omr.baca_gambar(p)
+                if img is not None:
+                    gambar.append((p.name, img))
+            return sesi_mod.proses_lembar(body.template, gambar)
+
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    def worker():
+        try:
+            aktif = scanner.scanner_aktif()
+            if not aktif:
+                raise scanner.ScannerError("Scanner tidak terdeteksi.")
+
+            def cb_scan(saat_ini: int, total: int, pesan: str):
+                try:
+                    loop.call_soon_threadsafe(
+                        queue.put_nowait,
+                        {
+                            "tipe": "progress",
+                            "fase": "scan",
+                            "saat_ini": saat_ini,
+                            "total": total,
+                            "pesan": pesan,
+                        },
+                    )
+                except Exception:
+                    pass
+
+            with tempfile.TemporaryDirectory() as tmp:
+                path_hasil = aktif.scan_batch(
+                    Path(tmp), "lembar", target_jml, callback_progress=cb_scan
+                )
+                if not path_hasil:
+                    raise scanner.ScannerError("Tidak ada lembar terbaca dari scanner.")
+
+                total_scanned = len(path_hasil)
+                try:
+                    loop.call_soon_threadsafe(
+                        queue.put_nowait,
+                        {
+                            "tipe": "progress",
+                            "fase": "scan_selesai",
+                            "saat_ini": total_scanned,
+                            "total": total_scanned,
+                            "pesan": f"Scanner selesai: {total_scanned} lembar berhasil dipindai.",
+                        },
+                    )
+                except Exception:
+                    pass
+
+                gambar = []
+                for p in path_hasil:
+                    img = omr.baca_gambar(p)
+                    if img is not None:
+                        gambar.append((p.name, img))
+
+                if not gambar:
+                    raise scanner.ScannerError(
+                        "Tidak ada lembar yang bisa dibaca sebagai gambar."
+                    )
+
+                def cb_proses(ev: dict[str, Any]):
+                    try:
+                        loop.call_soon_threadsafe(queue.put_nowait, ev)
+                    except Exception:
+                        pass
+
+                data = sesi_mod.proses_lembar(
+                    body.template, gambar, callback_progress=cb_proses
+                )
+                try:
+                    loop.call_soon_threadsafe(
+                        queue.put_nowait, {"tipe": "selesai", "data": data}
+                    )
+                except Exception:
+                    pass
+
+        except Exception as e:
+            try:
+                loop.call_soon_threadsafe(
+                    queue.put_nowait, {"tipe": "error", "pesan": str(e)}
+                )
+            except Exception:
+                pass
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    async def event_generator():
+        while True:
+            item = await queue.get()
+            yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n".encode("utf-8")
+            if item.get("tipe") in ("selesai", "error"):
+                break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/api/sesi/unggah")
-async def sesi_unggah(template: str, files: list[UploadFile] = File(...)):
-    gambar: list[tuple[str, np.ndarray]] = []
+async def sesi_unggah(
+    template: str,
+    files: list[UploadFile] = File(...),
+    stream: bool = True,
+):
+    if not stream:
+        gambar: list[tuple[str, np.ndarray]] = []
+        for f in files:
+            gambar.extend(sesi_mod.dari_unggahan(f.filename, await f.read()))
+        if not gambar:
+            raise HTTPException(
+                400, "Tidak ada berkas yang bisa dibaca sebagai gambar/PDF."
+            )
+        return sesi_mod.proses_lembar(template, gambar)
+
+    file_bytes: list[tuple[str, bytes]] = []
     for f in files:
-        gambar.extend(sesi_mod.dari_unggahan(f.filename, await f.read()))
-    if not gambar:
-        raise HTTPException(
-            400, "Tidak ada berkas yang bisa dibaca sebagai gambar/PDF."
-        )
-    return sesi_mod.proses_lembar(template, gambar)
+        file_bytes.append((f.filename, await f.read()))
+
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    def worker():
+        try:
+            try:
+                loop.call_soon_threadsafe(
+                    queue.put_nowait,
+                    {
+                        "tipe": "progress",
+                        "fase": "ekstrak",
+                        "saat_ini": 0,
+                        "total": len(file_bytes),
+                        "pesan": f"Mengekstrak {len(file_bytes)} berkas unggahan...",
+                    },
+                )
+            except Exception:
+                pass
+
+            gambar: list[tuple[str, np.ndarray]] = []
+            for fname, content in file_bytes:
+                gambar.extend(sesi_mod.dari_unggahan(fname, content))
+
+            if not gambar:
+                raise scanner.ScannerError(
+                    "Tidak ada berkas yang bisa dibaca sebagai gambar/PDF."
+                )
+
+            def cb_proses(ev: dict[str, Any]):
+                try:
+                    loop.call_soon_threadsafe(queue.put_nowait, ev)
+                except Exception:
+                    pass
+
+            data = sesi_mod.proses_lembar(
+                template, gambar, callback_progress=cb_proses
+            )
+            try:
+                loop.call_soon_threadsafe(
+                    queue.put_nowait, {"tipe": "selesai", "data": data}
+                )
+            except Exception:
+                pass
+
+        except Exception as e:
+            try:
+                loop.call_soon_threadsafe(
+                    queue.put_nowait, {"tipe": "error", "pesan": str(e)}
+                )
+            except Exception:
+                pass
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    async def event_generator():
+        while True:
+            item = await queue.get()
+            yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n".encode("utf-8")
+            if item.get("tipe") in ("selesai", "error"):
+                break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ======================= KOREKSI MANUAL =======================

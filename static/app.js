@@ -1033,9 +1033,194 @@ $("#btn-muat-template").onclick = async () => {
 };
 
 /* ===================== TAB 2: SCAN / UNGGAH ===================== */
+function formatWaktuLog() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function mulaiProsesUI(judul, sub = "Menyiapkan...") {
+  const box = $("#proses");
+  box.hidden = false;
+  $("#proses-teks").textContent = judul;
+  $("#proses-sub").textContent = sub;
+
+  const bar = $("#proses-bar-fill");
+  bar.style.width = "0%";
+  bar.classList.remove("indeterminate");
+
+  const list = $("#proses-log-list");
+  if (list) list.innerHTML = "";
+  const counter = $("#proses-log-counter");
+  if (counter) counter.textContent = "0 lembar";
+
+  tambahLogItem(`[${formatWaktuLog()}] Memulai: ${judul}`);
+}
+
+function tambahLogItem(pesan, tipe = "info") {
+  const list = $("#proses-log-list");
+  if (!list) return;
+  const item = document.createElement("div");
+  item.className = "proses-log-item " + tipe;
+  item.textContent = pesan;
+  list.appendChild(item);
+  list.scrollTop = list.scrollHeight;
+}
+
+function perbaruiProsesUI(ev) {
+  const judulEl = $("#proses-teks");
+  const subEl = $("#proses-sub");
+  const bar = $("#proses-bar-fill");
+  const counter = $("#proses-log-counter");
+  const t = formatWaktuLog();
+
+  if (ev.fase === "scan") {
+    if (ev.total && ev.total > 0) {
+      judulEl.textContent = `Scanner: Memindai lembar ${ev.saat_ini}/${ev.total}`;
+      subEl.textContent = "Sedang memindai... jangan buka penutup scanner.";
+      const persen = Math.min(100, Math.round((ev.saat_ini / ev.total) * 100));
+      bar.classList.remove("indeterminate");
+      bar.style.width = persen + "%";
+      if (counter) counter.textContent = `${ev.saat_ini}/${ev.total} lembar`;
+    } else {
+      judulEl.textContent =
+        ev.saat_ini > 0
+          ? `Scanner: Berhasil memindai ${ev.saat_ini} lembar`
+          : "Scanner: Memindai dari feeder ADF...";
+      subEl.textContent = "Mode dinamis (otomatis sampai feeder ADF habis).";
+      bar.classList.add("indeterminate");
+      if (counter) counter.textContent = `${ev.saat_ini} lembar`;
+    }
+    tambahLogItem(`[${t}] ${ev.pesan}`, "scan");
+  } else if (ev.fase === "scan_selesai") {
+    judulEl.textContent = `Scanner Selesai (${ev.saat_ini} lembar)`;
+    subEl.textContent = "Menyiapkan pembacaan OMR...";
+    bar.classList.remove("indeterminate");
+    bar.style.width = "100%";
+    if (counter) counter.textContent = `${ev.saat_ini} lembar`;
+    tambahLogItem(`[${t}] ✓ ${ev.pesan}`, "scan");
+  } else if (ev.fase === "ekstrak") {
+    judulEl.textContent = "Mengekstrak berkas unggahan...";
+    subEl.textContent = ev.pesan;
+    bar.classList.add("indeterminate");
+    tambahLogItem(`[${t}] ${ev.pesan}`, "info");
+  } else if (ev.fase === "proses") {
+    bar.classList.remove("indeterminate");
+    if (ev.total && ev.total > 0) {
+      const persen = Math.min(100, Math.round((ev.saat_ini / ev.total) * 100));
+      judulEl.textContent = `Python: Memproses lembar ${ev.saat_ini}/${ev.total}`;
+      subEl.textContent =
+        "Meluruskan lembar, deteksi marker, & membaca bulatan OMR.";
+      bar.style.width = persen + "%";
+      if (counter) counter.textContent = `${ev.saat_ini}/${ev.total} lembar`;
+    } else {
+      judulEl.textContent = `Python: Memproses lembar ke-${ev.saat_ini}`;
+      subEl.textContent = "Membaca bulatan OMR...";
+    }
+    tambahLogItem(`[${t}] ${ev.pesan}`, "proses");
+  } else if (ev.fase === "selesai") {
+    judulEl.textContent = "Selesai!";
+    subEl.textContent = "Semua lembar berhasil dibaca. Membuka hasil...";
+    bar.classList.remove("indeterminate");
+    bar.style.width = "100%";
+    tambahLogItem(`[${t}] ✓ ${ev.pesan}`, "proses");
+  } else {
+    judulEl.textContent = ev.pesan || "Memproses...";
+    tambahLogItem(`[${t}] ${ev.pesan || ""}`, "info");
+  }
+}
+
+function selesaiProsesUI() {
+  $("#proses").hidden = true;
+}
+
 function tampilProses(teks) {
-  $("#proses").hidden = !teks;
-  $("#proses-teks").textContent = teks || "";
+  if (!teks) selesaiProsesUI();
+  else mulaiProsesUI(teks);
+}
+
+async function bacaStreamSesi(response, onProgress) {
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      detail = (await response.json()).detail || detail;
+    } catch (_) {}
+    throw new Error(detail);
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("text/event-stream")) {
+    return await response.json();
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  let hasilData = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop();
+
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      for (const line of trimmed.split("\n")) {
+        const tr = line.trim();
+        if (tr.startsWith("data:")) {
+          const raw = tr.substring(5).trim();
+          try {
+            const ev = JSON.parse(raw);
+            if (ev.tipe === "progress") {
+              if (onProgress) onProgress(ev);
+            } else if (ev.tipe === "selesai") {
+              hasilData = ev.data;
+            } else if (ev.tipe === "error") {
+              throw new Error(ev.pesan || "Terjadi kesalahan saat memproses.");
+            }
+          } catch (e) {
+            if (e.message && !e.message.startsWith("Unexpected token")) {
+              throw e;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (!hasilData) {
+    throw new Error("Proses selesai tanpa mengembalikan data sesi.");
+  }
+  return hasilData;
+}
+
+// Inisialisasi pilihan mode scan (Dinamis vs Manual)
+const modeDinamis = $("#mode-scan-dinamis");
+const modeManual = $("#mode-scan-manual");
+const wadahJumlah = $("#wadah-jumlah-lembar");
+const petunjukScan = $("#petunjuk-scan");
+
+if (modeDinamis && modeManual) {
+  const updateModeScan = () => {
+    if (modeDinamis.checked) {
+      if (wadahJumlah) wadahJumlah.style.display = "none";
+      if (petunjukScan) {
+        petunjukScan.textContent =
+          "Letakkan lembar di ADF scanner. Semua lembar di penampung akan dipindai otomatis sampai habis tanpa batas jumlah.";
+      }
+    } else {
+      if (wadahJumlah) wadahJumlah.style.display = "flex";
+      if (petunjukScan) {
+        petunjukScan.textContent =
+          "Letakkan lembar di ADF scanner. Scanner akan memindai tepat sejumlah lembar yang ditentukan.";
+      }
+    }
+  };
+  modeDinamis.addEventListener("change", updateModeScan);
+  modeManual.addEventListener("change", updateModeScan);
 }
 
 async function lanjutKePeriksa(data, namaTemplate) {
@@ -1060,22 +1245,53 @@ $("#btn-mulai-scan").onclick = async () => {
     $("#info-scan").textContent = "Pilih template dulu.";
     return;
   }
-  const jml = parseInt($("#scan-jumlah").value) || 1;
+
+  const isDinamis = $("#mode-scan-dinamis")
+    ? $("#mode-scan-dinamis").checked
+    : false;
+  let jml = 0;
+  if (!isDinamis) {
+    jml = parseInt($("#scan-jumlah").value) || 1;
+    if (jml < 1) jml = 1;
+  }
+
   $("#info-scan").textContent = "";
   $("#btn-mulai-scan").disabled = true;
-  tampilProses(`Memindai ${jml} lembar… jangan buka penutup scanner.`);
+
+  mulaiProsesUI(
+    isDinamis
+      ? "Menghubungi scanner untuk scan otomatis..."
+      : `Memindai ${jml} lembar...`,
+    isDinamis
+      ? "Mode dinamis (semua lembar di feeder ADF sampai habis)..."
+      : "Jangan buka penutup scanner.",
+  );
+
   try {
-    await lanjutKePeriksa(
-      await kirimJson("/api/sesi/scan", { template: tpl, jumlah: jml }),
-      tpl,
-    );
+    const res = await fetch("/api/sesi/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        template: tpl,
+        jumlah: jml,
+        dinamis: isDinamis,
+        stream: true,
+      }),
+    });
+
+    const data = await bacaStreamSesi(res, (ev) => {
+      perbaruiProsesUI(ev);
+    });
+
+    await lanjutKePeriksa(data, tpl);
   } catch (e) {
     $("#info-scan").className = "info err";
     $("#info-scan").textContent = e.message;
     toast(e.message, true);
+    tambahLogItem(`[${formatWaktuLog()}] ❌ Gagal: ${e.message}`, "err");
   } finally {
     $("#btn-mulai-scan").disabled = false;
-    tampilProses("");
+    selesaiProsesUI();
   }
 };
 
@@ -1090,22 +1306,34 @@ async function unggahBanyak(fileList) {
   if (!files.length) return;
   const fd = new FormData();
   files.forEach((f) => fd.append("files", f));
-  tampilProses(`Membaca ${files.length} berkas…`);
+
   $("#info-scan").textContent = "";
+  mulaiProsesUI(
+    `Membaca ${files.length} berkas unggahan...`,
+    "Mengekstrak gambar...",
+  );
+
   try {
-    await lanjutKePeriksa(
-      await apiJson("/api/sesi/unggah?template=" + encodeURIComponent(tpl), {
+    const res = await fetch(
+      "/api/sesi/unggah?template=" + encodeURIComponent(tpl) + "&stream=true",
+      {
         method: "POST",
         body: fd,
-      }),
-      tpl,
+      },
     );
+
+    const data = await bacaStreamSesi(res, (ev) => {
+      perbaruiProsesUI(ev);
+    });
+
+    await lanjutKePeriksa(data, tpl);
   } catch (e) {
     $("#info-scan").className = "info err";
     $("#info-scan").textContent = e.message;
     toast(e.message, true);
+    tambahLogItem(`[${formatWaktuLog()}] ❌ Gagal: ${e.message}`, "err");
   } finally {
-    tampilProses("");
+    selesaiProsesUI();
   }
 }
 const dz = $("#dropzone");
