@@ -10,7 +10,7 @@ ROOT_DIR = SPEC_DIR.parent
 # File dan folder statis yang dimasukkan ke dalam .exe
 datas = [
     (str(ROOT_DIR / "static"), "static"),
-    (str(ROOT_DIR / "LJK PPTSB.json"), "."),
+    (str(ROOT_DIR / "LJK PPTSB FINAL.json"), "."),
 ]
 
 # Hidden imports yang sering dibutuhkan oleh FastAPI, Uvicorn, Pydantic, PyMuPDF, dan OpenCV

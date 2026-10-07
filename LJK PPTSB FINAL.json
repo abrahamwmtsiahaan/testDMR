@@ -1,0 +1,310 @@
+{
+  "nama": "LJK PPTSB FINAL",
+  "kriteria": [
+    {
+      "nama": "nama_peserta",
+      "arah_baca": "vertikal",
+      "jumlah_kolom": 22,
+      "jumlah_baris": 26,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+        "S",
+        "T",
+        "U",
+        "V",
+        "W",
+        "X",
+        "Y",
+        "Z"
+      ],
+      "grid": {
+        "x0": 115.17076923638493,
+        "y0": 1012.4143912442171,
+        "dx": 51.61260495262379,
+        "dy": 52.5305676864227
+      }
+    },
+    {
+      "nama": "nomor_peserta",
+      "arah_baca": "vertikal",
+      "jumlah_kolom": 11,
+      "jumlah_baris": 10,
+      "jenis_label": "angka0",
+      "label_kustom": "",
+      "label_baris": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "grid": {
+        "x0": 1456.0146941577425,
+        "y0": 1065.1069327104058,
+        "dx": 51.4712260570092,
+        "dy": 52.34837714864196
+      }
+    },
+    {
+      "nama": "kode_soal",
+      "arah_baca": "vertikal",
+      "jumlah_kolom": 3,
+      "jumlah_baris": 10,
+      "jenis_label": "angka0",
+      "label_kustom": "",
+      "label_baris": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "grid": {
+        "x0": 2072.8436297954945,
+        "y0": 1065.2501126679401,
+        "dx": 52.07207532911616,
+        "dy": 52.359954313141316
+      }
+    },
+    {
+      "nama": "1_5",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 218.12602698187942,
+        "y0": 2640.239815343406,
+        "dx": 51.740265839834805,
+        "dy": 51.11157875929564
+      }
+    },
+    {
+      "nama": "6_10",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 217.1794411190077,
+        "y0": 2948.5930106433366,
+        "dx": 51.38438809893763,
+        "dy": 52.473809754745616
+      }
+    },
+    {
+      "nama": "11_15",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 684.4008452036786,
+        "y0": 2639.5563312593404,
+        "dx": 50.90685827314181,
+        "dy": 51.1469849631095
+      }
+    },
+    {
+      "nama": "16_20",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 681.7298894211983,
+        "y0": 2949.9837419301602,
+        "dx": 51.105231986956426,
+        "dy": 52.02492197498714
+      }
+    },
+    {
+      "nama": "21_25",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 1145.025537204304,
+        "y0": 2639.3600028598908,
+        "dx": 51.6215820342303,
+        "dy": 51.220588026934934
+      }
+    },
+    {
+      "nama": "26_30",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 1144.9689477890327,
+        "y0": 2947.711213776058,
+        "dx": 50.810807597154735,
+        "dy": 52.71621288204801
+      }
+    },
+    {
+      "nama": "31_35",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 1609.8878373029984,
+        "y0": 2640.3058278132717,
+        "dx": 51.06314903962749,
+        "dy": 51.161397343308636
+      }
+    },
+    {
+      "nama": "36_40",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 1608.3131509355326,
+        "y0": 2949.313535316161,
+        "dx": 51.49357782424147,
+        "dy": 52.22398318345063
+      }
+    },
+    {
+      "nama": "41_45",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 2071.390148674101,
+        "y0": 2639.621663011503,
+        "dx": 51.49357782424147,
+        "dy": 51.49357782424147
+      }
+    },
+    {
+      "nama": "46_50",
+      "arah_baca": "horizontal",
+      "jumlah_kolom": 5,
+      "jumlah_baris": 5,
+      "jenis_label": "huruf",
+      "label_kustom": "",
+      "label_baris": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "grid": {
+        "x0": 2069.929337955683,
+        "y0": 2949.313535316161,
+        "dx": 51.49357782424147,
+        "dy": 52.22398318345063
+      }
+    }
+  ],
+  "contoh": "/media/contoh/2cac973ae775.png"
+}
