@@ -21,31 +21,34 @@ def _pantau_proses_scan(
     pola_glob: str,
     jumlah: int = 0,
     callback_progress: Optional[Callable[[int, int, str], None]] = None,
-    timeout_inaktif: float = 60.0,
-    timeout_maks: float = 900.0,
+    timeout_inaktif: Optional[float] = None,
+    timeout_maks: Optional[float] = None,
 ) -> tuple[int, str, str]:
     """
     Memantau berkas gambar baru yang dihasilkan scanner secara real-time.
     Memanggil callback_progress setiap kali ada lembar baru yang selesai dipindai.
+    Tidak ada batasan waktu (timeout) ketat untuk scan dinamis agar dapat memindai
+    banyak lembar tanpa terputus.
     """
     waktu_mulai = time.time()
-    waktu_terakhir = time.time()
+    waktu_terakhir_laporan = time.time()
     terdeteksi = set()
 
     if callback_progress:
         if jumlah and jumlah > 0:
             callback_progress(0, jumlah, f"Scanner: Memulai pemindaian {jumlah} lembar...")
         else:
-            callback_progress(0, 0, "Scanner: Memulai pemindaian otomatis dari ADF...")
+            callback_progress(0, 0, "Scanner: Memulai pemindaian otomatis dari ADF (dinamis)...")
 
     while proc.poll() is None:
         sekarang = time.time()
+        ada_file_baru = False
         for p in glob.glob(pola_glob):
             if p not in terdeteksi:
                 try:
                     if os.path.getsize(p) > 0:
                         terdeteksi.add(p)
-                        waktu_terakhir = sekarang
+                        ada_file_baru = True
                         n = len(terdeteksi)
                         if callback_progress:
                             if jumlah and jumlah > 0:
@@ -59,12 +62,37 @@ def _pantau_proses_scan(
                 except OSError:
                     pass
 
-        if sekarang - waktu_terakhir > timeout_inaktif:
+        # Berikan status berkala jika proses scanner masih aktif berjalan
+        if not ada_file_baru and (sekarang - waktu_terakhir_laporan >= 6.0):
+            waktu_terakhir_laporan = sekarang
+            durasi = int(sekarang - waktu_mulai)
+            menit, detik = divmod(durasi, 60)
+            teks_durasi = f"{menit}m {detik:02d}s" if menit > 0 else f"{detik}s"
+            if callback_progress:
+                n = len(terdeteksi)
+                if n > 0:
+                    if jumlah and jumlah > 0:
+                        callback_progress(
+                            n, jumlah, f"Scanner: Sedang memindai ({n}/{jumlah} lembar, berjalan {teks_durasi})..."
+                        )
+                    else:
+                        callback_progress(
+                            n, 0, f"Scanner: Sedang memindai ({n} lembar selesai, berjalan {teks_durasi})..."
+                        )
+                else:
+                    callback_progress(
+                        0,
+                        jumlah if (jumlah and jumlah > 0) else 0,
+                        f"Scanner: Mesin scanner sedang aktif memindai lembar di ADF ({teks_durasi})...",
+                    )
+
+        # Cek batas waktu HANYA jika disetel secara eksplisit (default None / tanpa batas)
+        if timeout_inaktif is not None and (sekarang - waktu_terakhir_laporan > timeout_inaktif):
             proc.kill()
-            raise ScannerError("Waktu pemindaian habis (scanner tidak merespons selama 60 detik).")
-        if sekarang - waktu_mulai > timeout_maks:
+            raise ScannerError(f"Waktu pemindaian habis (scanner tidak merespons selama {int(timeout_inaktif)} detik).")
+        if timeout_maks is not None and (sekarang - waktu_mulai > timeout_maks):
             proc.kill()
-            raise ScannerError("Batas waktu pemindaian maksimal (15 menit) terlampaui.")
+            raise ScannerError("Batas waktu pemindaian maksimal terlampaui.")
 
         time.sleep(0.3)
 
