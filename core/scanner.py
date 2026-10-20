@@ -21,16 +21,15 @@ def _pantau_proses_scan(
     pola_glob: str,
     jumlah: int = 0,
     callback_progress: Optional[Callable[[int, int, str], None]] = None,
-    timeout_inaktif: Optional[float] = None,
+    timeout_inaktif: Optional[float] = 30.0,
     timeout_maks: Optional[float] = None,
 ) -> tuple[int, str, str]:
     """
     Memantau berkas gambar baru yang dihasilkan scanner secara real-time.
     Memanggil callback_progress setiap kali ada lembar baru yang selesai dipindai.
-    Tidak ada batasan waktu (timeout) ketat untuk scan dinamis agar dapat memindai
-    banyak lembar tanpa terputus.
     """
     waktu_mulai = time.time()
+    waktu_terakhir_aktivitas = time.time()
     waktu_terakhir_laporan = time.time()
     terdeteksi = set()
 
@@ -49,6 +48,7 @@ def _pantau_proses_scan(
                     if os.path.getsize(p) > 0:
                         terdeteksi.add(p)
                         ada_file_baru = True
+                        waktu_terakhir_aktivitas = sekarang
                         n = len(terdeteksi)
                         if callback_progress:
                             if jumlah and jumlah > 0:
@@ -63,7 +63,7 @@ def _pantau_proses_scan(
                     pass
 
         # Berikan status berkala jika proses scanner masih aktif berjalan
-        if not ada_file_baru and (sekarang - waktu_terakhir_laporan >= 6.0):
+        if not ada_file_baru and (sekarang - waktu_terakhir_laporan >= 5.0):
             waktu_terakhir_laporan = sekarang
             durasi = int(sekarang - waktu_mulai)
             menit, detik = divmod(durasi, 60)
@@ -86,10 +86,14 @@ def _pantau_proses_scan(
                         f"Scanner: Mesin scanner sedang aktif memindai lembar di ADF ({teks_durasi})...",
                     )
 
-        # Cek batas waktu HANYA jika disetel secara eksplisit (default None / tanpa batas)
-        if timeout_inaktif is not None and (sekarang - waktu_terakhir_laporan > timeout_inaktif):
+        # Cek batas waktu tidak ada respons
+        if timeout_inaktif is not None and (sekarang - waktu_terakhir_aktivitas > timeout_inaktif):
             proc.kill()
-            raise ScannerError(f"Waktu pemindaian habis (scanner tidak merespons selama {int(timeout_inaktif)} detik).")
+            raise ScannerError(
+                f"Scanner tidak merespons selama {int(timeout_inaktif)} detik "
+                "(kemungkinan mesin masuk mode Sleep atau kabel USB tertidur). "
+                "Silakan tekan tombol Power di mesin scanner atau cabut-colok kabel USB, lalu coba lagi."
+            )
         if timeout_maks is not None and (sekarang - waktu_mulai > timeout_maks):
             proc.kill()
             raise ScannerError("Batas waktu pemindaian maksimal terlampaui.")
@@ -128,17 +132,102 @@ class ScannerBase:
 
 class ScannerSANE(ScannerBase):
     """Ubuntu/Linux: scanimage. Tanpa sudo (user harus ada di grup 'scanner')."""
-    nama = "SANE (scanimage)"
+    _cache_device: Optional[tuple[str, str, float]] = None
+
+    @property
+    def nama(self) -> str:
+        try:
+            _, desc = self._cari_device()
+            return f"SANE ({desc})"
+        except Exception:
+            return "SANE (scanimage)"
 
     def tersedia(self):
         return shutil.which("scanimage") is not None
 
-    def _cari_device(self):
+    def _cari_device(self, force_refresh: bool = False) -> tuple[str, str]:
+        now = time.time()
+        if not force_refresh and self._cache_device and (now - self._cache_device[2] < 10.0):
+            return self._cache_device[0], self._cache_device[1]
+
         r = subprocess.run(["scanimage", "-L"], capture_output=True, text=True)
-        m = re.search(r"device `(.*?)'", r.stdout)
-        if not m:
+        matches = re.findall(r"device `([^']+)' is a (.*)", r.stdout)
+        kandidat = []
+        for dev, desc in matches:
+            dev_l = dev.lower()
+            desc_l = desc.lower()
+            if dev_l.startswith("v4l") or "webcam" in desc_l or "virtual device" in desc_l:
+                continue
+            kandidat.append((dev, desc.strip()))
+
+        if not kandidat:
+            m = re.search(r"device `([^']+)'", r.stdout)
+            if m and not m.group(1).startswith("v4l"):
+                kandidat.append((m.group(1), "Scanner"))
+
+        if not kandidat:
             raise ScannerError("Scanner tidak ditemukan. Cek kabel USB dan pastikan mesin menyala.")
-        return m.group(1)
+
+        # Prioritaskan scanner dokumen ADF USB (Fujitsu, Brother, dsb.)
+        terpilih = kandidat[0]
+        for dev, desc in kandidat:
+            d_lower = (dev + " " + desc).lower()
+            if "fujitsu" in d_lower or "brother" in d_lower:
+                terpilih = (dev, desc)
+                break
+
+        self._cache_device = (terpilih[0], terpilih[1], now)
+        return terpilih
+
+    def _tentukan_source(self, device: str) -> Optional[str]:
+        dev_l = device.lower()
+        if "fujitsu" in dev_l:
+            return "ADF Front"
+        elif "brother" in dev_l:
+            return "Automatic Document Feeder(left aligned)"
+        
+        try:
+            r = subprocess.run(
+                ["scanimage", f"--device-name={device}", "--help"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            out = r.stdout + r.stderr
+            if "ADF Front" in out:
+                return "ADF Front"
+            elif "Automatic Document Feeder(left aligned)" in out:
+                return "Automatic Document Feeder(left aligned)"
+            elif "Automatic Document Feeder" in out:
+                return "Automatic Document Feeder"
+            elif "ADF" in out:
+                return "ADF"
+        except Exception:
+            pass
+        return None
+
+    def _tentukan_mode(self, device: str) -> Optional[str]:
+        dev_l = device.lower()
+        if "fujitsu" in dev_l:
+            return "Color"
+        elif "brother" in dev_l:
+            return "24bit Color"
+        
+        try:
+            r = subprocess.run(
+                ["scanimage", f"--device-name={device}", "--help"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            out = r.stdout + r.stderr
+            if "24bit Color" in out:
+                return "24bit Color"
+            elif "Color" in out:
+                return "Color"
+        except Exception:
+            pass
+        return "Color"
 
     def scan_batch(
         self,
@@ -148,14 +237,20 @@ class ScannerSANE(ScannerBase):
         dpi=300,
         callback_progress=None,
     ):
-        device = self._cari_device()
+        device, desc = self._cari_device()
         pola = str(folder / f"{prefix}_%03d.png")
         cmd = [
             "scanimage", f"--device-name={device}",
-            "--source=Automatic Document Feeder(left aligned)",
             f"--resolution={dpi}", "--format=png",
             f"--batch={pola}", "--batch-start=1",
         ]
+        source = self._tentukan_source(device)
+        if source:
+            cmd.insert(2, f"--source={source}")
+        mode = self._tentukan_mode(device)
+        if mode:
+            cmd.insert(3, f"--mode={mode}")
+
         if jumlah and jumlah > 0:
             cmd.append(f"--batch-count={jumlah}")
 
@@ -168,9 +263,12 @@ class ScannerSANE(ScannerBase):
             str(folder / f"{prefix}_*.png"),
             jumlah=jumlah,
             callback_progress=callback_progress,
+            timeout_inaktif=30.0,
         )
-        if ret not in (0, 7):      # 7 = ADF habis (normal)
-            raise ScannerError(f"Scan gagal (kode {ret}): {stderr.strip()[-300:]}")
+        if ret not in (0, 7):      # 7 = ADF habis (normal di Brother), 0 = normal
+            gabungan_err = (stderr + " " + stdout).lower()
+            if "out of documents" not in gabungan_err:
+                raise ScannerError(f"Scan gagal (kode {ret}): {stderr.strip()[-300:]}")
 
         files = sorted(Path(p) for p in glob.glob(str(folder / f"{prefix}_*.png")))
         if jumlah and jumlah > 0:
